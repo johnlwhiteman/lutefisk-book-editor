@@ -1,0 +1,495 @@
+// Print layout: real book pagination with trim sizes, mirrored margins,
+// recto chapter openings, running heads, folios (roman front matter), single
+// page or two-page spread view, and PDF export of exactly what you see.
+import { ART_PAPERS, artCss } from './print-art.js';
+import { sidePicker } from './side-picker.js';
+import { blockStyleCss } from '../shared/blockstyle.js';
+import { coverOpts, coverAlt, coverImgCss, trimCoverMargins } from '../shared/cover.js';
+import { TRIMS, PX_PER_IN } from '../shared/print.js';
+import { baseCss, templateCss, templateById, withCasePrefs } from '../shared/templates.js';
+import { FONTS, fontStack } from '../shared/fonts.js';
+import { toRoman, SECTION_TYPES, DISPLAY_TYPES, printDropCaps, dropCapLines } from '../shared/sections.js';
+import { termRegex } from '../shared/bookhtml.js';
+import { h, icon, toast, magnifier, popover, rangeBubble, keepCaretLow } from './ui.js';
+import { templateStrip } from './preview-device.js';
+
+const RECTO_TYPES = new Set(['title-page', 'dedication', 'epigraph', 'toc', 'foreword', 'preface', 'introduction', 'prologue', 'chapter', 'epilogue', 'acknowledgments', 'appendix', 'endnotes', 'bibliography', 'index', 'about-author', 'glossary', 'contributors']);
+const G = 96; // gap between columns in the measuring flow
+
+export function createPrintPreview(host, app) {
+  const P = () => app.book.print;
+  let cache = new Map(); // secId → { html, count, settingsKey }
+  let layout = { pages: [], bySec: new Map() };
+  let current = 0; // index into layout.pages
+  let settingsKey = '';
+  let tocKey = '';
+
+  /* --------------------------------------------------------- controls */
+  const fontSel = h('select', { 'aria-label': 'Print font' }, h('option', { value: '' }, 'Template font'),
+    FONTS.filter((f) => !f.system && f.kind !== 'display' && f.kind !== 'mono').map((f) => h('option', { value: f.id }, f.family)));
+  // Body type size of the printed book: 9–14 pt in half points.
+  const sizeSel = h('input', { type: 'range', min: 9, max: 14, step: 0.5, 'aria-label': 'Font size', 'aria-valuetext': '', class: 'pv-size pp-size' });
+  const sayPt = () => sizeSel.setAttribute('aria-valuetext', `${sizeSel.value} points`);
+  sizeSel.addEventListener('input', sayPt);
+  rangeBubble(sizeSel, (v) => `${v} pt`, { hover: true });
+  const mag = magnifier('lutefisk.printZoom', () => fit());
+  // Drop caps: Off, two lines or three lines. The size is shared with e-books.
+  const dcBtn = h('button', { class: 'chip-toggle', title: 'Drop caps in print', 'aria-haspopup': 'menu', onclick: () => {
+    const cur = printDropCaps(app.book) ? dropCapLines(app.book) : 0;
+    const set = (n) => { if (n) app.book.dropCapLines = n; P().dropCaps = !!n; changed(); syncDc(); };
+    popover(dcBtn, [['Off', 0], ['Two lines', 2], ['Three lines', 3]].map(([label, n]) => ({ label, icon: cur === n ? 'check' : undefined, onClick: () => set(n) })));
+  } }, icon('dropcap', 15), h('span', {}, 'Drop caps'));
+  const syncDc = () => { const on = printDropCaps(app.book); dcBtn.classList.toggle('on', on); dcBtn.lastChild.textContent = on ? `Drop caps · ${dropCapLines(app.book)}` : 'Drop caps'; };
+  const firstBtn = h('button', { class: 'pg-btn', title: 'Beginning — the front cover (Home)', 'aria-label': 'Go to the front cover', onclick: () => go(-1) }, icon('toStart', 16));
+  const tocBtn = h('button', { class: 'pg-btn', title: 'Contents — every part of the book', 'aria-label': 'Contents — every part of the book', onclick: () => {
+    const items = [{ label: 'Front Cover', icon: 'cover', onClick: () => go(-1) }, '-'];
+    for (const sec of app.sections()) {
+      const info = layout?.bySec.get(sec.id);
+      if (!info) continue;
+      const label = sec.type === 'chapter' ? (sec.displayTitle ? `${sec.label ? `${sec.label}: ` : ''}${sec.displayTitle}` : sec.label || sec.tocTitle) : (sec.tocTitle || sec.displayTitle);
+      items.push({ label, hint: layout.pages[info.start]?.folio || '', icon: sec.type === 'toc' ? 'toc' : 'doc', onClick: () => go(info.start) });
+    }
+    items.push('-', { label: 'Back Cover', icon: 'book', onClick: () => go(layout.pages.length) });
+    popover(tocBtn, items, { width: 300, maxHeight: 460 });
+  } }, icon('toc', 15));
+  const prevBtn = h('button', { class: 'pg-btn', title: 'Previous (← or ↓)', 'aria-label': 'Previous page', onclick: () => step(-1) }, icon('prev', 16));
+  const nextBtn = h('button', { class: 'pg-btn', title: 'Next (→ or ↑)', 'aria-label': 'Next page', onclick: () => step(1) }, icon('next', 16));
+  const lastBtn = h('button', { class: 'pg-btn', title: 'End — the back cover (End)', 'aria-label': 'Go to the back cover', onclick: () => go(layout.pages.length) }, icon('toEnd', 16));
+  const pageLbl = h('div', { class: 'pg-label' });
+  const progress = h('div', { class: 'pg-progress' }, h('i'));
+  const pager = h('div', { class: 'pager' }, tocBtn, firstBtn, prevBtn, h('div', { class: 'pg-mid' }, pageLbl, progress), nextBtn, lastBtn); // |‹ the front cover · ‹ › · ›| the back cover
+  // Row 1 (shared header): text size and zoom. Row 2: page setup and templates.
+  // Row 1 (shared header): page fit and type size, just left of Focus. Zoom is at the right of row 2.
+  const row1 = h('div', { class: 'pv-row1-items' }, h('label', { class: 'pv-ctl size-ctl pp-size-ctl' }, h('span', { class: 'small-a', title: 'Type size — the body text of the printed book, 9 to 14 pt' }, 'A'), sizeSel, h('span', { class: 'big-a', title: 'Type size — the body text of the printed book, 9 to 14 pt' }, 'A')));
+  // Paper: how the pages look in this preview only (the PDF itself has no background).
+  const PLAIN = [['cream', 'Cream'], ['white', 'Bright White'], ['ivory', 'Ivory'], ['natural', 'Natural'], ['recycled', 'Recycled'], ['laid', 'Laid'], ['linen', 'Linen'], ['parchment', 'Parchment'], ['antique', 'Antique'], ['gray', 'Newsprint']];
+  const PAPERS = [...PLAIN, ...ART_PAPERS.map(([v, l]) => [v, l])];
+  const regions = [...new Set(ART_PAPERS.map((a) => a[2]))];
+  let paper = (() => { try { return localStorage.getItem('lutefisk.printPaper') || 'cream'; } catch { return 'cream'; } })();
+  if (!PAPERS.some(([v]) => v === paper)) paper = 'cream';
+  const showPaper = (v) => { for (const [k] of PAPERS) stage.classList.toggle(`paper-${k}`, k === v); };
+  const setPaper = (v = paper) => {
+    paper = v; showPaper(v);
+    try { localStorage.setItem('lutefisk.printPaper', v); } catch { /* ignore */ }
+  };
+  // A small page in each paper or artwork, for the list.
+  const paperSwatch = (v) => () => h('span', { class: `pp-stage sp-paper paper-${v}` }, h('span', { class: 'pp-page' }));
+  const trimSwatch = (t) => () => { const k = 26 / Math.max(t.w, t.h); return h('span', { class: 'sp-trim', style: { width: `${(t.w * k).toFixed(1)}px`, height: `${(t.h * k).toFixed(1)}px` } }); };
+  const stageWrap = h('div', { class: 'dv-stage-wrap pp-stage-wrap' });
+  // Trim size and paper open a list at the left of the book; the book changes as you move through it.
+  let trimTimer = 0;
+  const trimPick = sidePicker({
+    wrap: stageWrap, beside: () => document.querySelector('.preview-pane'), label: 'Trim size', icon: 'book', title: 'Trim size — the page size of the printed book',
+    groups: [{ items: Object.entries(TRIMS).map(([k, t]) => ({ value: k, label: t.label.replace(/ \(.*\)$/, ''), hint: (/\((.*)\)/.exec(t.label) || [])[1] || '', swatch: trimSwatch(t) })) }],
+    get: () => (app.book ? P().trim || '6x9' : '6x9'),
+    preview: (v) => { P().trim = v; clearTimeout(trimTimer); trimTimer = setTimeout(() => { restyle(); invalidate(); app.refreshPreview(true); }, 90); },
+    commit: (v) => { clearTimeout(trimTimer); P().trim = v; changed(); },
+  });
+  const paperPick = sidePicker({
+    wrap: stageWrap, beside: () => document.querySelector('.preview-pane'), label: 'Paper and artwork', icon: 'doc', title: 'Paper or artwork — the look of the pages in this preview (doesn’t change the PDF)',
+    groups: [{ label: 'Paper', items: PLAIN.map(([v, l]) => ({ value: v, label: l, swatch: paperSwatch(v) })) },
+      ...regions.map((r) => ({ label: `Artwork — ${r}`, items: ART_PAPERS.filter((a) => a[2] === r).map(([v, l]) => ({ value: v, label: l, swatch: paperSwatch(v) })) }))],
+    get: () => paper,
+    preview: showPaper,
+    commit: (v) => setPaper(v),
+  });
+  const artStyle = h('style', {}, artCss());
+  const bar = h('div', { class: 'pv-bar' }, trimPick.button, paperPick.button);
+  const tplStrip = templateStrip(app);
+  const stage = h('div', { class: 'pp-stage', tabindex: 0, 'aria-label': 'Print preview' });
+  const desk = h('div', { class: 'pp-desk' });
+  // In preview Focus, the mouse turns pages like a reader: left button back, right button forward.
+  const focused = () => !!document.querySelector('.shell.preview-focus');
+  stage.addEventListener('mousedown', (e) => {
+    if (!focused() || (e.button !== 0 && e.button !== 2) || e.target.closest('a, button, input, select')) return;
+    e.preventDefault();
+    step(e.button === 2 ? 1 : -1);
+  });
+  stage.addEventListener('contextmenu', (e) => { if (focused()) e.preventDefault(); });
+
+  const styleEl = h('style');
+  const measure = h('div', { class: 'pp-measure', 'aria-hidden': 'true' });
+  const mflow = h('div', { class: 'pp-flow' });
+  measure.append(mflow);
+  stage.append(desk);
+  setPaper();
+  const sideL = h('button', { class: 'dv-side-arrow left', title: 'Previous (←)', 'aria-label': 'Previous page', onclick: () => step(-1) }, icon('arrowLeft', 22));
+  const sideR = h('button', { class: 'dv-side-arrow right', title: 'Next (→)', 'aria-label': 'Next page', onclick: () => step(1) }, icon('arrowRight', 22));
+  stage.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a || !stage.contains(a)) return;
+    e.preventDefault();
+    const m = /^#sec-(.+)$/.exec(a.getAttribute('href') || '');
+    const info = m && layout?.bySec.get(m[1]);
+    if (info) go(info.start);
+  });
+  stageWrap.append(stage, sideL, sideR);
+  host.append(bar, stageWrap, tplStrip, pager, styleEl, artStyle, measure);
+
+  fontSel.addEventListener('change', () => { P().font = fontSel.value; changed(); });
+  // The type grows or shrinks as you drag (each step redraws the pages; drags are coalesced to frames).
+  let sizeFrame = 0;
+  sizeSel.addEventListener('input', () => {
+    P().fontSize = +sizeSel.value;
+    if (sizeFrame) return;
+    sizeFrame = requestAnimationFrame(() => { sizeFrame = 0; changed(); });
+  });
+  stage.addEventListener('keydown', (e) => {
+    // → and ↑ advance; ← and ↓ go back.
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); step(1); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'PageUp') { e.preventDefault(); step(-1); }
+    if (e.key === 'Home') { e.preventDefault(); go(-1); }
+    if (e.key === 'End') { e.preventDefault(); go(layout.pages.length); }
+  });
+  stage.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); mag.step(e.deltaY < 0 ? 1 : -1); return; }
+    if (mag.get() > 1) return;
+    if (Math.abs(e.deltaY) > 30) { e.preventDefault(); step(e.deltaY > 0 ? 1 : -1); }
+  }, { passive: false });
+  stage.addEventListener('mousedown', () => stage.focus());
+  new ResizeObserver(() => fit()).observe(stage);
+
+  function changed() { app.markDirty(); restyle(); invalidate(); app.refreshPreview(true); }
+  function syncControls() {
+    const p = P();
+    trimPick.sync(); paperPick.sync();
+    fontSel.value = p.font || '';
+    sizeSel.value = String(p.fontSize || 11);
+    sayPt();
+    syncDc();
+  }
+
+  /* --------------------------------------------------------- metrics */
+  function metrics() {
+    const t = TRIMS[P().trim] || TRIMS['6x9'];
+    const pw = Math.round(t.w * PX_PER_IN), ph = Math.round(t.h * PX_PER_IN);
+    const inside = Math.round(t.inside * PX_PER_IN), outside = Math.round(t.outside * PX_PER_IN);
+    const top = Math.round(t.top * PX_PER_IN), bottom = Math.round(t.bottom * PX_PER_IN);
+    return { t, pw, ph, inside, outside, top, bottom, W: pw - inside - outside, H: ph - top - bottom, fontPx: (P().fontSize || 11) * (96 / 72) };
+  }
+
+  function bookCss(scope = '.pp-flow.bk') {
+    const book = app.book;
+    const tpl = withCasePrefs(templateById(book.template), book);
+    const m = metrics();
+    const ff = P().font ? fontStack(P().font) : null;
+    return `
+${baseCss(scope, 'print')}
+${templateCss(tpl, scope, { ctx: 'print', bodyFont: P().font || null, dropCaps: printDropCaps(book), dropCapLines: dropCapLines(book), color: false })}
+${blockStyleCss(book, scope)}
+/* The type size wins over the template's own scale: 11 pt here means 11 pt on paper. */
+.pp-body .pp-flow,.pp-measure .pp-flow{width:${m.W}px;height:${m.H}px;column-width:${m.W}px;column-gap:${G}px;column-fill:auto;font-size:${m.fontPx.toFixed(3)}px;color:#111;}
+.pp-flow img{max-height:${m.H - 20}px;object-fit:contain;filter:grayscale(1);}
+${ff ? `${scope}, ${scope} .bk-body p{font-family:${ff};}` : ''}
+`;
+  }
+
+  function restyle() {
+    const m = metrics();
+    const tpl = withCasePrefs(templateById(app.book.template), app.book);
+    styleEl.textContent = `${bookCss()}
+.pp-page{width:${m.pw}px;height:${m.ph}px;}
+.pp-body{top:${m.top}px;width:${m.W}px;height:${m.H}px;}
+.pp-page.recto .pp-body{left:${m.inside}px;} .pp-page.verso .pp-body{left:${m.outside}px;}
+.pp-head{top:${Math.round(m.top * 0.42)}px;font-size:${(m.fontPx * 0.78).toFixed(2)}px;font-family:${fontStack(tpl.head)};}
+.pp-page.recto .pp-head{left:${m.inside}px;right:${m.outside}px;} .pp-page.verso .pp-head{left:${m.outside}px;right:${m.inside}px;}
+.pp-head{${tpl.normalHeadings ? 'font-variant:normal;letter-spacing:normal;' : ''}}
+.pp-folio{bottom:${Math.round(m.bottom * 0.45)}px;font-size:${(m.fontPx * 0.85).toFixed(2)}px;font-family:${fontStack(P().font || tpl.body)};}
+.pp-page.recto .pp-folio{left:${m.inside}px;right:${m.outside}px;} .pp-page.verso .pp-folio{left:${m.outside}px;right:${m.inside}px;}
+${watermarkCss(m)}`;
+    const cls = `pp-flow bk tpl-${tpl.id}`;
+    mflow.className = cls;
+    settingsKey = JSON.stringify([P().trim, P().font, P().fontSize, P().watermark, P().watermarkStrength, app.book.template, printDropCaps(app.book), dropCapLines(app.book), app.book.firstLine, app.book.headingCase]);
+  }
+
+  /** The watermark: one line of text, corner to corner, sized to the page. */
+  function watermarkCss(m) {
+    const text = String(P().watermark || '').trim();
+    if (!text) return '';
+    const diag = Math.hypot(m.pw, m.ph);
+    const px = Math.max(12, Math.min(m.pw * 0.22, (diag * 0.72) / (text.length * 0.62)));
+    const deg = -(Math.atan2(m.ph, m.pw) * 180) / Math.PI;
+    const alpha = { light: 0.07, medium: 0.12, strong: 0.2 }[P().watermarkStrength] || 0.07;
+    return `.pp-wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;z-index:1}
+.pp-wm span{transform:rotate(${deg.toFixed(1)}deg);white-space:nowrap;font:600 ${px.toFixed(1)}px/1 ${fontStack(withCasePrefs(templateById(app.book.template), app.book).head)};letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,${alpha});-webkit-print-color-adjust:exact;print-color-adjust:exact}
+`;
+  }
+
+  function invalidate() { cache = new Map(); }
+
+  /* ---------------------------------------------------------- layout */
+  function countPages(html) {
+    mflow.innerHTML = html; // trusted renderer output (raw HTML disabled)
+    const m = metrics();
+    return Math.max(1, Math.round((mflow.scrollWidth + G) / (m.W + G)));
+  }
+
+  function sectionPages(sec, html) {
+    const c = cache.get(sec.id);
+    if (c && c.html === html && c.key === settingsKey) return c.count;
+    const count = countPages(html);
+    cache.set(sec.id, { html, count, key: settingsKey });
+    return count;
+  }
+
+  function buildLayout(tocPages, indexPages) {
+    const sections = app.sections();
+    const pages = [];
+    const bySec = new Map();
+    const roman = P().romanFrontMatter !== false;
+    const startRecto = P().startRecto !== false;
+    let bodyStart = -1;
+    for (const sec of sections) {
+      const html = app.renderSectionHtml(sec, { tocPages, indexPages });
+      const n = sectionPages(sec, html);
+      const group = SECTION_TYPES[sec.type]?.group;
+      const wantsRecto = sec.type === 'title-page' || (startRecto && RECTO_TYPES.has(sec.type) && sec.type !== 'copyright') || (group !== 'front' && bodyStart < 0);
+      if (wantsRecto && pages.length % 2 === 1) pages.push({ blank: true });
+      if (group !== 'front' && bodyStart < 0) bodyStart = pages.length;
+      bySec.set(sec.id, { start: pages.length, count: n, html });
+      for (let i = 0; i < n; i++) pages.push({ sec, i, html });
+    }
+    pages.forEach((p, idx) => {
+      const phys = idx + 1;
+      p.recto = phys % 2 === 1;
+      const inBody = bodyStart >= 0 && idx >= bodyStart;
+      p.folio = inBody ? String(idx - bodyStart + 1) : roman ? toRoman(phys) : String(phys);
+      if (p.blank) return;
+      const display = DISPLAY_TYPES.has(p.sec.type) || p.sec.type === 'title-page';
+      p.showFolio = !display;
+      p.showHead = !display && p.i > 0 && P().runningHeads !== false;
+      p.head = p.recto ? (P().rectoHead === 'chapter' ? p.sec.tocTitle : app.book.title) : app.book.author;
+    });
+    return { pages, bySec };
+  }
+
+  function computeLayout(indexPages) {
+    let tocPages = null;
+    let l = buildLayout(tocPages, indexPages);
+    for (let pass = 0; pass < 3; pass++) {
+      const next = {};
+      for (const [id, info] of l.bySec) next[id] = l.pages[info.start]?.folio ?? '';
+      const key = JSON.stringify(next);
+      if (key === JSON.stringify(tocPages)) break;
+      tocPages = next;
+      l = buildLayout(tocPages, indexPages);
+    }
+    layout = l;
+    tocKey = JSON.stringify(tocPages);
+    return l;
+  }
+
+  /* --------------------------------------------------------- drawing */
+  function pageEl(p, forExport = false) {
+    if (!p) return h('div', { class: 'pp-page empty' });
+    const m = metrics();
+    const el = h('div', { class: `pp-page ${p.recto ? 'recto' : 'verso'}${p.blank ? ' blank' : ''}` });
+    if (!p.blank) {
+      if (p.showHead) el.append(h('div', { class: 'pp-head' }, p.head || ''));
+      const flow = h('div', { class: mflow.className, style: { transform: `translateX(${-p.i * (m.W + G)}px)` } });
+      flow.innerHTML = p.html; // trusted renderer output
+      el.append(h('div', { class: 'pp-body' }, flow));
+      if (p.showFolio) el.append(h('div', { class: 'pp-folio' }, p.folio));
+      const wm = String(P().watermark || '').trim();
+      if (wm) el.append(h('div', { class: 'pp-wm', 'aria-hidden': 'true' }, h('span', {}, wm)));
+    }
+    if (!forExport) el.append(h('div', { class: 'pp-shade' }));
+    return el;
+  }
+
+  // current: -1 = front cover, 0..n-1 = interior pages, n = back cover.
+  function coverEl(kind) {
+    const book = app.book;
+    const src = kind === 'front' ? book.cover : book.backCover;
+    const el = h('div', { class: `pp-page pp-cover ${kind === 'front' ? 'recto' : 'verso'}` });
+    const key = kind === 'front' ? 'cover' : 'backCover';
+    if (src) { const img = h('img', { src: 'book://current/' + src.split('/').map(encodeURIComponent).join('/'), alt: coverAlt(book, key) }); img.style.cssText = coverImgCss(coverOpts(book, key), trimCoverMargins(metrics().t)); el.classList.add(`ext-${coverOpts(book, key).extent}`); el.append(img); }
+    else if (kind === 'front') el.append(h('div', { class: 'cover-gen' }, h('div', { class: 'cg-title' }, book.title || 'Untitled'), book.subtitle ? h('div', { class: 'cg-sub' }, book.subtitle) : null, h('div', { class: 'cg-author' }, book.author || ''), h('div', { class: 'cg-hint' }, 'Add a cover image in Book › Cover')));
+    else el.append(h('div', { class: 'back-gen' }, h('p', {}, book.description || 'Add a back-cover image or a book description in Book settings.'), h('div', { class: 'bg-isbn' }, book.isbn ? `ISBN ${book.isbn}` : '')));
+    el.append(h('div', { class: 'pp-shade' }));
+    return el;
+  }
+
+  function draw() {
+    const pages = layout.pages;
+    if (!pages.length) return;
+    const n = pages.length;
+    current = Math.max(-1, Math.min(current, n));
+    const spread = true;
+    let items;
+    if (current === -1) items = spread ? [null, coverEl('front')] : [coverEl('front')];
+    else if (current === n) items = spread ? [coverEl('back'), null] : [coverEl('back')];
+    else if (spread) {
+      const left = (current + 1) % 2 === 0 ? current : current - 1;
+      items = [pages[left] ? pageEl(pages[left]) : null, pages[left + 1] ? pageEl(pages[left + 1]) : null];
+    } else items = [pageEl(pages[current])];
+    desk.className = `pp-desk ${spread ? 'spread' : 'single'}${current === -1 || current === n ? ' closed' : ''}`;
+    const book = h('div', { class: 'pp-book' }, items.map((el) => el || h('div', { class: 'pp-page empty' })));
+    if (spread && current >= 0 && current < n) book.append(h('div', { class: 'pp-spine' }));
+    desk.replaceChildren(book);
+    fit();
+    if (current === -1) pageLbl.textContent = 'Front cover';
+    else if (current === n) pageLbl.textContent = 'Back cover';
+    else {
+      const p = pages[current];
+      pageLbl.textContent = `${p.blank ? 'Blank page' : `Page ${p.folio}`} · ${p.sec ? p.sec.tocTitle : ''}`.replace(/ · $/, '') + `  (${current + 1} of ${n})`;
+    }
+    progress.firstChild.style.width = `${(((current + 1) / (n + 1)) * 100).toFixed(1)}%`;
+    prevBtn.disabled = current === -1;
+    nextBtn.disabled = current === n;
+    sideL.disabled = prevBtn.disabled; sideR.disabled = nextBtn.disabled;
+    firstBtn.classList.toggle('on', current === -1);
+    lastBtn.classList.toggle('on', current === n);
+  }
+
+  function go(i) { current = i; draw(); }
+
+  function fit() {
+    if (!app.book) return;
+    const r = stage.getBoundingClientRect();
+    const m = metrics();
+    const spread = true;
+    const w = spread ? m.pw * 2 : m.pw;
+    const z = mag.get();
+    stage.classList.toggle('zoomed', z > 1);
+    // The open book fills the view: as large as fits, whole, with a small margin.
+    const base = Math.min((r.width - 32) / w, (r.height - 32) / m.ph);
+    const s = base * z;
+    desk.style.setProperty('--s', String(Math.max(0.1, s)));
+    desk.style.width = `${w * s}px`;
+    desk.style.height = `${m.ph * s}px`;
+  }
+
+  function step(dir) {
+    const n = layout.pages.length;
+    const spread = true;
+    if (current === -1) { if (dir > 0) current = 0; }
+    else if (current === n) { if (dir < 0) current = n - 1; }
+    else if (spread) {
+      const left = (current + 1) % 2 === 0 ? current : current - 1;
+      current = dir > 0 ? (left + 2 > n - 1 ? n : left + 2) : (left - 1 < 0 ? -1 : left - 1);
+    } else current += dir;
+    draw();
+  }
+
+  /** Find the page in the measuring flow holding the caret. */
+  function caretPage(secId, caret) {
+    const info = layout.bySec.get(secId);
+    if (!info) return null;
+    if (!caret) return info.start;
+    mflow.innerHTML = info.html;
+    const body = mflow.querySelector('.bk-body');
+    const blocks = body ? [...body.children].filter((c) => !c.classList.contains('bk-author-photo')) : [];
+    const el = blocks[Math.min(caret.index, blocks.length - 1)];
+    if (!el) return info.start;
+    const rects = el.getClientRects();
+    if (!rects.length) return info.start;
+    const r = rects[Math.min(rects.length - 1, Math.floor(caret.frac * rects.length))];
+    const m = metrics();
+    const col = Math.floor((r.left - mflow.getBoundingClientRect().left + 2) / (m.W + G));
+    return info.start + Math.max(0, Math.min(info.count - 1, col));
+  }
+
+  /* ---------------------------------------------------------- export */
+  function indexPageMap() {
+    const terms = (app.book.index?.terms || []).map(String).filter(Boolean);
+    if (!terms.length) return {};
+    const res = Object.fromEntries(terms.map((t) => [t, new Set()]));
+    const m = metrics();
+    for (const [id, info] of layout.bySec) {
+      const sec = app.sections().find((s) => s.id === id);
+      if (!sec || SECTION_TYPES[sec.type]?.generated) continue;
+      mflow.innerHTML = info.html;
+      const base = mflow.getBoundingClientRect().left;
+      const walker = document.createTreeWalker(mflow.querySelector('.bk-body') || mflow, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        for (const t of terms) {
+          const re = new RegExp(termRegex(t).source, 'giu');
+          for (const match of node.data.matchAll(re)) {
+            const start = match.index + match[1].length;
+            const range = document.createRange();
+            range.setStart(node, start);
+            range.setEnd(node, Math.min(node.data.length, start + t.length));
+            const rect = range.getClientRects()[0];
+            if (!rect) continue;
+            const col = Math.floor((rect.left - base + 2) / (m.W + G));
+            const pg = layout.pages[info.start + Math.max(0, Math.min(info.count - 1, col))];
+            if (pg) res[t].add(pg.folio);
+          }
+        }
+      }
+    }
+    const out = {};
+    for (const [t, set] of Object.entries(res)) out[t] = [...set];
+    return out;
+  }
+
+  async function exportPdf() {
+    restyle();
+    computeLayout();
+    const idx = indexPageMap();
+    if (Object.keys(idx).length) computeLayout(idx);
+    const m = metrics();
+    const pages = [...layout.pages];
+    const parts = [];
+    if (P().includeCover && app.book.cover) {
+      parts.push(`<div class="pp-page cover"><img src="${'book://current/' + app.book.cover.split('/').map(encodeURIComponent).join('/')}" alt="${escapeText(coverAlt(app.book, 'cover')).replace(/"/g, '&quot;')}" style="${coverImgCss(coverOpts(app.book, 'cover'), trimCoverMargins(m.t))}"></div>`);
+      parts.push('<div class="pp-page blank"></div>');
+    }
+    for (const p of pages) parts.push(pageEl(p, true).outerHTML);
+    const html = `<!DOCTYPE html><html lang="${app.book.language || 'en'}"><head><meta charset="utf-8"><title>${escapeText(app.book.title || 'Book')}</title>
+<link rel="stylesheet" href="app://lutefisk/styles/fonts.css">
+<style>
+@page{size:${m.t.w}in ${m.t.h}in;margin:0}
+html,body{margin:0;padding:0;background:#fff}
+.pp-page{position:relative;overflow:hidden;break-after:page;page-break-after:always;background:#fff;color:#111}
+.pp-page:last-child{break-after:auto;page-break-after:auto}
+.pp-body{position:absolute;overflow:hidden}
+.pp-head,.pp-folio{position:absolute;text-align:center;letter-spacing:.08em;font-variant:small-caps;color:#333}
+.pp-folio{letter-spacing:0;font-variant:normal}
+.pp-page.cover{background:#fff}
+${styleEl.textContent}
+</style></head><body>${parts.join('\n')}</body></html>`;
+    toast('Rendering PDF…');
+    return window.lutefisk.exportPdf({ html, widthIn: m.t.w, heightIn: m.t.h, title: app.book.title });
+  }
+
+  return {
+    row1,
+    zoom: mag,
+    init() { syncControls(); restyle(); },
+    /** Re-layout after edits. sectionId/caret: where the writer is. */
+    update(sectionId, caret, opts = {}) {
+      if (opts.full) { syncControls(); restyle(); invalidate(); }
+      computeLayout();
+      let line = null;
+      if (sectionId && (caret || opts.jump)) {
+        const pg = caretPage(sectionId, caret);
+        if (pg != null) current = pg;
+        if (caret && pg != null) line = { index: caret.index, frac: caret.frac };
+      }
+      draw();
+      // Zoomed in: the caret's line sits low in the view, with the text before it above.
+      if (line && stage.classList.contains('zoomed')) {
+        const left = (current + 1) % 2 === 0 ? current : current - 1;
+        const pageBox = desk.querySelectorAll('.pp-book > .pp-page')[current - left];
+        const body = pageBox?.querySelector('.bk-body');
+        const blocks = body ? [...body.children].filter((c) => !c.classList.contains('bk-author-photo')) : [];
+        const el = blocks[Math.min(line.index, blocks.length - 1)];
+        const rects = el ? [...el.getClientRects()] : [];
+        const pr = pageBox?.getBoundingClientRect();
+        // The block may run across pages: use its line that's on this page.
+        const onPage = pr ? rects.filter((r) => r.left >= pr.left - 1 && r.right <= pr.right + 1) : [];
+        const r = rects[Math.min(rects.length - 1, Math.floor(line.frac * rects.length))];
+        if (onPage.length) keepCaretLow(stage, onPage.includes(r) ? r : onPage.at(-1));
+      }
+    },
+    exportPdf,
+    get pageCount() { return layout.pages.length; },
+    get tocKey() { return tocKey; },
+  };
+}
+
+function escapeText(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
