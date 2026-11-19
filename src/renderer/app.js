@@ -17,8 +17,8 @@ import { openCharacters, suggestNames } from './characters.js';
 import { openPlot } from './plot.js';
 import { createSearch } from './search.js';
 import { replaceInMarkdown, typoMarkdown } from './editor.js';
-import { loadSettings, settings, autosaver, openSettings, backupProject, backupDialog, themeButton, onSettings, addDictionaryWord, updateSettings, setToolbarPos, paneOrder, setPaneOrder, PANE_ORDERS, paneOrderLabel, EDITOR_FONTS } from './settings.js';
-import { setDictionary, warmUp, setIgnored, ignoredList, unignore, proofCounts, setSentenceSpacing } from './spellcheck.js';
+import { loadSettings, settings, setSkin, setTheme, autosaver, openSettings, backupProject, backupDialog, themeButton, onSettings, addDictionaryWord, updateSettings, setToolbarPos, paneOrder, setPaneOrder, PANE_ORDERS, paneOrderLabel, EDITOR_FONTS } from './settings.js';
+import { setDictionary, setRules, warmUp, setIgnored, ignoredList, unignore, proofCounts, setSentenceSpacing } from './spellcheck.js';
 import { countMentions, newCharacter } from '../shared/characters.js';
 import { createCommentRail } from './comments.js';
 import { GROUPS, SECTION_TYPES, DEFAULT_CONTENT, defaultBook, ensureSections, newId, numberSections, aboutAuthorsLabel, syncAuthors } from '../shared/sections.js';
@@ -229,7 +229,7 @@ async function newBookSheet(lib) {
   const tone = newCoverTone(lib.books || []);
   // The logline: required — the story in one or two sentences.
   const ll = { logline: '' };
-  const loglineBox = loglineField(ll, () => {}, { required: true, rows: 2 });
+  const loglineBox = loglineField(ll, () => {}, { required: true, rows: 3 });
   // Design: a list where ↑ ↓ and pointing show each design on the book; only a click or Return chooses it.
   let design = 'classic', shown = '';
   const GROUPS_ = ['General', 'Fiction', 'Literary', 'Nonfiction'].map((c) => ({ c, items: TEMPLATES.filter((t) => t.category === c).sort((a, b) => a.name.localeCompare(b.name)) })).filter((g) => g.items.length);
@@ -569,10 +569,10 @@ function buildShell() {
   // run as you type (Settings › Spelling & Grammar); either can also be
   // checked on demand, which keeps its underlines until you move to other text.
   const spellChanged = () => {
-    const sig = JSON.stringify([settings.spellLive, settings.grammarLive, settings.spellDialect, settings.spellStyle, settings.dictionary]);
+    const sig = JSON.stringify([settings.spellLive, settings.grammarLive, settings.spellDialect, settings.spellStyle, settings.dictionary, settings.lintRules]);
     if (sig === spellSig) return;
     spellSig = sig;
-    setDictionary(settings.dictionary || []).finally(() => app.editor?.recheckSpelling?.());
+    setRules(settings.lintRules || {}).then(() => setDictionary(settings.dictionary || [])).finally(() => app.editor?.recheckSpelling?.());
   };
   let spellSig = '';
   onSettings(spellChanged);
@@ -1311,6 +1311,8 @@ function refreshSidebar() {
       popover(addBtn, items, { width: 220 });
     });
     const ul = h('ul', { class: 'sb-list', role: 'listbox', 'aria-label': g.label });
+    // Chapters are numbered in the binder (as the book counts them: excluded ones aren't).
+    let chapterNo = 0;
     for (const s of included) {
       const def = SECTION_TYPES[s.type];
       const sceneHit = filterActive() && hasScenes(s) && s.scenes.some(matchesFilter);
@@ -1320,8 +1322,13 @@ function refreshSidebar() {
       const open = scenes && (app.expanded.has(s.id) || findScene(app.currentId)?.chapter === s || (filterActive() && s.scenes.some(matchesFilter)));
       const disc = scenes ? h('span', { class: `sb-disc${open ? ' open' : ''}`, role: 'button', 'aria-label': open ? 'Collapse scenes' : 'Expand scenes', onclick: (e) => { e.stopPropagation(); if (open) app.expanded.delete(s.id); else app.expanded.add(s.id); refreshSidebar(); } }, icon('next', 12)) : null;
       if (scenes) li.classList.add('has-scenes');
+      const num = s.type === 'chapter' && !s.exclude ? ++chapterNo : 0;
+      // Body rows: a column for the scenes arrow, then the chapter's number (or the section's icon).
+      const lead = g.id === 'body'
+        ? [disc || h('span', { class: 'sb-disc sb-disc-none', 'aria-hidden': 'true' }), num ? h('span', { class: 'sb-num', 'aria-hidden': 'true' }, String(num)) : icon(TYPE_ICON[s.type] || 'doc', 15)]
+        : [disc || icon(TYPE_ICON[s.type] || 'doc', 15)];
       const name = h('button', { class: 'sb-name', onclick: () => selectSection(s.id), oncontextmenu: (e) => { e.preventDefault(); rowMenu(name, s); } },
-        disc || icon(TYPE_ICON[s.type] || 'doc', 15),
+        ...lead,
         ...rowDecor(s).slice(0, 1),
         h('span', { class: 'sb-label' }, label(s)),
         ...rowDecor(s).slice(1),
@@ -1341,8 +1348,8 @@ function refreshSidebar() {
     }
     const shut = collapsedGroups.has(g.id) && !filterActive();
     const head = h('button', { class: 'sb-head-btn', 'aria-expanded': String(!shut), title: shut ? `Show ${g.label}` : `Hide ${g.label}`, onclick: () => { if (collapsedGroups.has(g.id)) collapsedGroups.delete(g.id); else collapsedGroups.add(g.id); saveCollapsed(); refreshSidebar(); } },
-      h('span', { class: `sb-disc${shut ? '' : ' open'}` }, icon('next', 11)), h('span', {}, g.label), shut && included.length ? h('span', { class: 'sb-count' }, String(included.length)) : null);
-    scroller.append(h('section', { class: `sb-group${shut ? ' shut' : ''}` }, h('div', { class: 'sb-head' }, head, addBtn), shut ? null : ul));
+      h('span', { class: `sb-disc${shut ? '' : ' open'}` }, icon('next', 11)), h('span', { class: 'sb-head-label' }, g.label), included.length ? h('span', { class: 'sb-head-count' }, String(included.length)) : null);
+    scroller.append(h('section', { class: `sb-group sb-part sb-${g.id}${shut ? ' shut' : ''}` }, h('div', { class: 'sb-head' }, head, addBtn), shut ? null : ul));
   }
   scroller.append(binRow());
   sb.append(scroller, app.search.panel);
@@ -3235,6 +3242,12 @@ function openBibliography() {
 /* ================================================================= menu */
 
 B.onMenu(async (cmd) => {
+  // View › Text Size, Appearance, Skin and Contrast.
+  if (cmd.startsWith('skin:')) return setSkin(cmd.slice(5));
+  if (cmd.startsWith('theme:')) return setTheme(cmd.slice(6));
+  if (cmd.startsWith('size:')) return updateSettings({ uiZoom: Number(cmd.slice(5)) });
+  if (cmd.startsWith('contrast:')) return updateSettings({ contrast: Number(cmd.slice(9)) });
+  if (cmd === 'ui-zoom-changed') return loadSettings();
   switch (cmd) {
     case 'new-book': await showLibrary(); return newBookSheet(await B.library());
     case 'open-book': return openBook();

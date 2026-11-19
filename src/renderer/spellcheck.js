@@ -10,12 +10,14 @@ import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 
 export const spellKey = new PluginKey('harper');
-const DIALECTS = { american: Dialect.American, british: Dialect.British, canadian: Dialect.Canadian, australian: Dialect.Australian, indian: Dialect.Indian };
+const DIALECTS = { american: Dialect.American, british: Dialect.British, canadian: Dialect.Canadian, australian: Dialect.Australian };
 
 let linter = null;
 let linterDialect = '';
 let loading = null;
 let words = [];
+// Rules you've turned on or off (Settings › Spelling & Grammar › Rules): name → true/false; the rest keep Harper's defaults.
+let ruleOverrides = {};
 const ignored = new Set(); // "problem text|message" ignored for this session
 /** One or two spaces after a sentence (Tools): the checker follows the writer's choice. */
 let sentenceSpacing = 'one';
@@ -47,6 +49,7 @@ async function getLinter(dialect = 'american') {
     const l = new LocalLinter({ binary, dialect: DIALECTS[dialect] ?? Dialect.American });
     await l.setup();
     if (words.length) await l.importWords(words);
+    await applyRules(l);
     linter = l;
     return l;
   })();
@@ -55,8 +58,32 @@ async function getLinter(dialect = 'american') {
 
 /** Words you've added to your dictionary (kept in Settings, on this computer). */
 export async function setDictionary(list) {
-  words = [...new Set((list || []).filter((w) => typeof w === 'string' && w.trim()))];
+  const next = [...new Set((list || []).filter((w) => typeof w === 'string' && w.trim()))];
+  const removed = words.some((w) => !next.includes(w));
+  words = next;
+  // Harper can only add words: after a removal, start a fresh checker (it imports the list again).
+  if (removed && linter) { const old = linter; linter = null; linterDialect = ''; try { await old.dispose(); } catch { /* ignore */ } return; }
   if (linter && words.length) await linter.importWords(words);
+}
+
+/** Harper's defaults with your choices on top. */
+async function applyRules(l) {
+  const def = await l.getDefaultLintConfig();
+  await l.setLintConfig({ ...def, ...ruleOverrides });
+}
+/** Your rule choices (from Settings). */
+export async function setRules(overrides) {
+  ruleOverrides = overrides && typeof overrides === 'object' ? { ...overrides } : {};
+  if (linter) await applyRules(linter);
+}
+/**
+ * Every rule, for the Rules window: Harper's groups (structured), each rule's default and its
+ * description. Rules come from Harper itself, so new ones appear on their own.
+ */
+export async function ruleCatalog(dialect = 'american') {
+  const l = await getLinter(dialect);
+  const [structured, defaults, descriptions] = await Promise.all([l.getStructuredLintConfig(), l.getDefaultLintConfig(), l.getLintDescriptions()]);
+  return { structured, defaults, descriptions };
 }
 
 /**

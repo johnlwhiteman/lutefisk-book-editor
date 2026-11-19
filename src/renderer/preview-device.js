@@ -148,10 +148,10 @@ export function createDevicePreview(host, app) {
     h('option', { value: '' }, 'Template font'),
     h('optgroup', { label: 'Included fonts' }, FONTS.filter((f) => !f.system && f.kind !== 'display' && f.kind !== 'mono').map((f) => h('option', { value: f.id }, f.family + (f.note ? ` — ${f.note}` : '')))),
     h('optgroup', { label: 'Device fonts (if installed)' }, FONTS.filter((f) => f.system).map((f) => h('option', { value: f.id }, `${f.family} — ${f.note}`))));
-  // Text size: 100% is the normal reading size; from 50% to 150%.
+  // Text size: 100% is the normal reading size; from 50% to 200%.
   // Stored as points (book.preview.fontPt; 11 pt = 100%), so older settings carry over.
-  const size = h('input', { type: 'range', min: 50, max: 150, step: 5, 'aria-label': 'Font size', class: 'pv-size' });
-  const ptToPct = (pt) => Math.min(150, Math.max(50, Math.round(((pt || 11) * 100 / 11) / 5) * 5));
+  const size = h('input', { type: 'range', min: 50, max: 200, step: 5, 'aria-label': 'Font size', class: 'pv-size' });
+  const ptToPct = (pt) => Math.min(200, Math.max(50, Math.round(((pt || 11) * 100 / 11) / 5) * 5));
   const themeSel = h('select', { 'aria-label': 'Theme', class: 'pv-theme' }, ['light', 'sepia', 'dark'].map((t) => h('option', { value: t }, t[0].toUpperCase() + t.slice(1))));
   const firstBtn = h('button', { class: 'pg-btn', title: 'Beginning — the front cover (Home)', 'aria-label': 'Go to the front cover', onclick: () => app.previewJump('cover') }, icon('toStart', 16));
   const tocBtn = h('button', { class: 'pg-btn', title: 'Contents — every part of the book', 'aria-label': 'Contents — every part of the book', onclick: () => app.previewContents?.(tocBtn) }, icon('toc', 15));

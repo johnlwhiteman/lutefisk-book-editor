@@ -1481,7 +1481,7 @@ kbd { font: 12px/1 ui-monospace, Menlo, monospace; padding: 3px 6px; border-radi
 
 /* Skins picker */
 .st-sub { margin-top: 14px; }
-.skin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 6px 0; }
+.skin-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 6px 0; }
 .skin-card { display: grid; gap: 5px; justify-items: center; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--sep); background: var(--surface); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
 .skin-card:hover { background: var(--fill); }
 .skin-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
@@ -1532,8 +1532,8 @@ kbd { font: 12px/1 ui-monospace, Menlo, monospace; padding: 3px 6px; border-radi
 
 .ll-main { font-family: var(--serif); font-size: 18px; line-height: 1.5; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--sep-strong); background: var(--surface); color: var(--text); resize: vertical; }
 .ll-meter { font-size: 12px; color: var(--text-3); }
-.ll-meter.good { color: var(--ok, #2e7d32); }
-.ll-meter.long, .ll-meter.short { color: #b26a00; }
+
+.ll-meter.long { color: #b26a00; }
 
 .th-body { display: grid; gap: 12px; max-width: 760px; }
 .th-capture { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
@@ -1660,9 +1660,27 @@ html[data-a11y-spacing="relaxed"] .ql-editor { line-height: 1.85 !important; }
 html[data-a11y-spacing="relaxed"] .ql-editor p { margin-bottom: .7em; }
 html[data-a11y-spacing="loose"] .ql-editor { line-height: 2.15 !important; word-spacing: .08em; }
 html[data-a11y-spacing="loose"] .ql-editor p { margin-bottom: 1em; }
-html[data-a11y-contrast="on"] { --text-2: color-mix(in srgb, var(--text) 88%, transparent); --text-3: color-mix(in srgb, var(--text) 72%, transparent); --sep: color-mix(in srgb, var(--text) 26%, transparent); --sep-strong: color-mix(in srgb, var(--text) 45%, transparent); }
-html[data-a11y-contrast="on"] a, html[data-a11y-contrast="on"] .ql-editor a { text-decoration: underline; }
-html[data-a11y-contrast="on"] .hint { color: var(--text-2); }
+/* Contrast (Settings › Vision & Comfort, View › Contrast): softer, standard, stronger, strongest. */
+html[data-contrast="soft"] { --text-2: color-mix(in srgb, var(--text) 60%, var(--bg)); --text-3: color-mix(in srgb, var(--text) 44%, var(--bg)); --sep: color-mix(in srgb, var(--text) 8%, transparent); --sep-strong: color-mix(in srgb, var(--text) 14%, transparent); }
+html[data-contrast="soft"] .ql-editor, html[data-contrast="soft"] .ProseMirror { color: color-mix(in srgb, var(--editor-ink, var(--text)) 82%, var(--bg)); }
+html[data-contrast="strong"] { --text-2: color-mix(in srgb, var(--text) 88%, transparent); --text-3: color-mix(in srgb, var(--text) 72%, transparent); --sep: color-mix(in srgb, var(--text) 26%, transparent); --sep-strong: color-mix(in srgb, var(--text) 45%, transparent); }
+html[data-contrast="max"] { --text-2: var(--text); --text-3: color-mix(in srgb, var(--text) 88%, transparent); --sep: color-mix(in srgb, var(--text) 45%, transparent); --sep-strong: color-mix(in srgb, var(--text) 70%, transparent); --fill: color-mix(in srgb, var(--text) 9%, transparent); --fill-2: color-mix(in srgb, var(--text) 15%, transparent); }
+html[data-contrast="strong"] a, html[data-contrast="strong"] .ql-editor a, html[data-contrast="max"] a, html[data-contrast="max"] .ql-editor a { text-decoration: underline; }
+html[data-contrast="strong"] .hint, html[data-contrast="max"] .hint { color: var(--text-2); }
+/* Stronger: no pattern behind the binder's text; Strongest: no pattern anywhere. */
+html[data-contrast="strong"] .sidebar { background-image: none !important; }
+html[data-contrast="max"] .titlebar, html[data-contrast="max"] .sidebar, html[data-contrast="max"] .library, html[data-contrast="max"] .preview-pane { background-image: none !important; }
+html[data-contrast="max"] .sb-label, html[data-contrast="max"] .st-main, html[data-contrast="max"] .tb-btn { font-weight: 500; }
+html[data-contrast="max"] .sb-group.sb-part { box-shadow: inset 0 0 0 1.5px var(--sep-strong); }
+/* Text size steps in Settings. */
+.st-row-wide { flex-wrap: wrap; }
+.size-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.size-step { display: grid; justify-items: center; align-content: end; gap: 1px; min-width: 76px; height: 70px; padding: 6px 8px; border: 1px solid var(--sep); border-radius: 10px; background: var(--surface); color: var(--text); cursor: pointer; }
+.size-step:hover { background: var(--fill); }
+.size-step.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.size-a { font-family: var(--serif); font-weight: 600; line-height: 1; }
+.size-name { font-size: 12px; font-weight: 600; }
+.size-step small { font-size: 10.5px; color: var(--text-3); }
 html[data-a11y-focus="on"] :focus-visible, html[data-a11y-focus="on"] :focus { outline: 3px solid var(--accent) !important; outline-offset: 2px !important; }
 html[data-a11y-focus="on"] .ql-editor:focus, html[data-a11y-focus="on"] .ProseMirror:focus { outline-offset: -3px !important; }
 html[data-a11y-motion="reduce"] *, html[data-a11y-motion="reduce"] *::before, html[data-a11y-motion="reduce"] *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
@@ -1677,10 +1695,6 @@ html[data-a11y-motion="reduce"] *, html[data-a11y-motion="reduce"] *::before, ht
 .hp-style { text-decoration-style: dotted; text-decoration-color: #8e4ec6; text-decoration-thickness: 2px; background: rgba(142, 78, 198, .12); }
 @media print { .hp-lint { background: none; text-decoration: none; } }
 .popover .pop-head { white-space: normal; max-width: 320px; }
-.dict-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.dict-word { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border-radius: 12px; background: var(--fill); font-size: 12.5px; }
-.dict-word button { border: 0; background: none; color: var(--text-3); cursor: pointer; width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; }
-.dict-word button:hover { background: var(--fill-2); color: var(--text); }
 
 /* ------------------------------------------------------------------- help */
 .help-sheet { width: min(980px, 95vw); height: min(720px, 92vh); }
@@ -2339,7 +2353,7 @@ html[data-editor-font]:not([data-editor-font=""]) .ql-editor { font-family: var(
 .lib-goal-txt { white-space: normal; font-size: 11.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .lib-goal.late .lib-goal-txt { color: var(--danger, #c0392b); }
 /* New Book: the logline box in the form's own type. */
-.nb-form .ll-main { font: 13px/1.45 var(--ui); resize: none; height: calc(2 * 1.45em + 14px); min-height: 0; overflow-y: auto; }
+.nb-form .ll-main { font: 13px/1.45 var(--ui); padding: 8px 10px; resize: none; height: calc(3 * 1.45em + 16px + 2px); min-height: 0; overflow-y: auto; }
 /* "Use this cover?" */
 .cc { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .cc-row { display: flex; align-items: flex-end; justify-content: center; gap: 22px; }
@@ -2349,3 +2363,146 @@ html[data-editor-font]:not([data-editor-font=""]) .ql-editor { font-family: var(
 .cc-old .cc-frame { width: 120px; opacity: .8; }
 .cc-size { font-size: 12px; color: var(--text-3); text-align: center; max-width: 380px; }
 .cc-size.warn { color: #b8641a; }
+
+/* ---- Binder polish: each part of the book on its own soft card, numbered chapters,
+   a warmer highlight for where you are. Colors come from the skin's variables. */
+.sidebar { --sb-card: color-mix(in srgb, var(--surface) 62%, transparent); --sb-card-edge: color-mix(in srgb, var(--sep) 70%, transparent); }
+.sb-group.sb-part { margin: 12px 0 0; padding: 4px 4px 6px; border-radius: 12px; background: var(--sb-card); box-shadow: inset 0 0 0 1px var(--sb-card-edge), 0 1px 2px rgba(0, 0, 0, .03); }
+.sb-group.sb-part.shut { padding-bottom: 4px; }
+.sb-part .sb-head { height: 28px; padding: 0 2px 0 4px; }
+.sb-head-btn { gap: 6px; }
+.sb-head-label { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); }
+.sb-head-count { min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--fill); color: var(--text-3); font-size: 10.5px; font-weight: 600; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.sb-part .sb-list { display: flex; flex-direction: column; gap: 1px; }
+.sb-part .sb-name { height: 30px; gap: 7px; }
+.sb-part .sb-label { font-size: 13.5px; }
+/* Where you are: a soft accent wash and a slim bar at the edge. */
+.sb-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.sb-row.active::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--accent); }
+.sb-row.active .sb-label { color: var(--text); font-weight: 600; }
+/* Chapter numbers in the Body. */
+.sb-disc-none { visibility: hidden; }
+.sb-num { flex: none; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-3); background: var(--fill); }
+.sb-row.active .sb-num { color: #fff; background: var(--accent); }
+.sb-row.excluded .sb-num { opacity: .5; }
+/* Scenes hang under their chapter, on a faint guide line. */
+.sb-part .sb-row.scene .sb-name { height: 27px; padding-left: 44px; }
+.sb-part .sb-row.scene::after { content: ''; position: absolute; left: 31px; top: 0; bottom: 0; width: 1px; background: var(--sep); }
+.sb-part .sb-row.scene.active::after { background: var(--accent); width: 2px; left: 30px; }
+.sb-part .sb-row.scene.active::before { display: none; }
+@media (prefers-reduced-motion: no-preference) { .sb-row { transition: background-color .12s; } }
+/* Room for titles: a narrower arrow column and tighter gaps in the Body. */
+.sidebar .sb-scroll { padding-left: 8px; padding-right: 8px; }
+.sb-group.sb-part { padding-left: 3px; padding-right: 3px; }
+.sb-part .sb-name { padding: 0 6px 0 5px; gap: 6px; }
+.sb-body .sb-name > .sb-disc { width: 11px; margin-right: -1px; }
+.sb-part .sb-row.scene .sb-name { padding-left: 38px; }
+.sb-part .sb-row.scene::after { left: 26px; }
+.sb-part .sb-row.scene.active::after { left: 25px; }
+
+/* ---- Preview bars, polished: one family of soft controls, one height (30px), one rhythm.
+   Row 1: E-book | Print, Zoom … text size, Focus, hide. Row 2: device (or trim and paper),
+   the template as one control, the reading theme. */
+.preview-pane { --pv-h: 30px; }
+.preview-pane .pv-switch { gap: 6px; padding: 9px 10px 0 12px; align-items: center; }
+.preview-pane .pv-bar { gap: 6px; row-gap: 6px; padding: 8px 10px 9px 12px; align-items: center; }
+/* E-book | Print */
+.preview-pane .pv-switch .segmented { height: var(--pv-h); padding: 2px; border-radius: 9px; box-sizing: border-box; }
+.preview-pane .pv-switch .segmented button { height: 26px; padding: 0 11px; border-radius: 7px; font-size: 12.5px; }
+/* Zoom and the text-size slider: soft wells at the same height. */
+.preview-pane .mag { height: var(--pv-h); border-radius: 9px; padding: 0 2px; }
+.preview-pane .mag button { height: 26px; min-width: 26px; border-radius: 7px; font-size: 12px; }
+.preview-pane .size-ctl { height: var(--pv-h); border-radius: 9px; padding: 0 10px; gap: 8px; }
+/* Focus and hide: quiet icon buttons. */
+.preview-pane .pv-switch .focus-btn, .preview-pane .pv-switch .sb-tool { width: var(--pv-h); height: var(--pv-h); padding: 0; border-radius: 8px; background: transparent; color: var(--text-2); display: inline-grid; place-items: center; }
+.preview-pane .pv-switch .focus-btn:hover, .preview-pane .pv-switch .sb-tool:hover { background: var(--fill); color: var(--text); }
+.preview-pane .pv-switch .focus-btn.on { background: var(--accent-soft); color: var(--accent-text, var(--accent)); }
+/* Row 2 pickers: the same soft well, no outline until you point at them. */
+.preview-pane .pv-bar .sp-btn { height: var(--pv-h); border: 0; border-radius: 9px; background: var(--fill); padding: 0 10px; gap: 7px; font-size: 12.5px; box-shadow: none; }
+.preview-pane .pv-bar .sp-btn:hover { background: var(--fill-2); }
+.preview-pane .pv-bar .sp-btn.on, .preview-pane .pv-bar .sp-btn[aria-expanded="true"] { background: var(--raised); box-shadow: 0 0 0 1.5px var(--accent); }
+.preview-pane .pv-bar .theme-ctl { margin: 0; }
+/* The template: ◀ name ▶ in one well, the gear beside it. */
+.preview-pane .ts-strip.ts-top { gap: 0; padding: 2px; height: var(--pv-h); box-sizing: border-box; border-radius: 9px; background: var(--fill); }
+.preview-pane .ts-strip.ts-top .ts-btn { height: 26px; min-width: 140px; max-width: 210px; border: 0; border-radius: 7px; background: transparent; box-shadow: none; padding: 0 8px; font-size: 12.5px; }
+.preview-pane .ts-strip.ts-top .ts-btn:hover { background: var(--raised); box-shadow: 0 0 0 .5px var(--sep-strong); }
+.preview-pane .ts-strip.ts-top .ts-arrow { width: 24px; height: 26px; border-radius: 7px; }
+.preview-pane .ts-strip.ts-top .ts-arrow:hover { background: var(--raised); }
+.preview-pane .ts-strip.ts-top .ts-cfg { margin-left: 2px; border-left: 1px solid var(--sep); border-radius: 0 7px 7px 0; width: 28px; }
+/* Pager: soft round buttons that match the bars. */
+.preview-pane .pager { gap: 6px; padding: 8px 12px 12px; }
+.preview-pane .pg-btn { width: 32px; height: 32px; background: var(--fill); box-shadow: none; color: var(--text-2); }
+.preview-pane .pg-btn:hover:not(:disabled) { background: var(--fill-2); color: var(--text); }
+.preview-pane .pg-btn.on { background: var(--accent); color: #fff; }
+.preview-pane .pg-mid { margin: 0 10px; }
+.preview-pane .dv-caption { letter-spacing: .01em; }
+/* Narrow previews: keep row 1 on one line — icons only for E-book | Print and a shorter
+   slider; narrower still, the slider loses its little A's. */
+.preview-pane { container: pvpane / inline-size; }
+.preview-pane .pv-switch { flex-wrap: nowrap; min-width: 0; }
+.preview-pane .pv-switch > * { flex-shrink: 0; }
+.preview-pane .pv-switch .spacer { flex: 1 1 0; min-width: 0; }
+@container pvpane (max-width: 500px) {
+  .preview-pane .pv-switch .segmented button span { display: none; }
+  .preview-pane .pv-switch .segmented button { padding: 0 9px; }
+  .preview-pane .size-ctl .pv-size { width: 56px; }
+  .preview-pane .size-ctl { padding: 0 8px; gap: 6px; }
+}
+@container pvpane (max-width: 420px) {
+  .preview-pane .size-ctl .small-a, .preview-pane .size-ctl .big-a { display: none; }
+  .preview-pane .ts-strip.ts-top .ts-btn { min-width: 110px; }
+}
+/* The logline box: three lines tall, wherever it appears (it scrolls past that). */
+.ll-main { font-size: 15px; line-height: 1.5; padding: 10px 12px; height: calc(3 * 1.5em + 20px + 2px); min-height: 0; resize: none; overflow-y: auto; box-sizing: border-box; }
+
+/* Settings › Spelling & Grammar: dictionary and rules rows. */
+.st-proof { gap: 10px; }
+.st-proof > span:first-child { min-width: 120px; }
+.st-proof-sum { flex: 1; color: var(--text-3); font-size: 12.5px; }
+/* Your Dictionary */
+.dc { display: flex; flex-direction: column; gap: 10px; min-width: min(520px, 80vw); }
+.dc-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dc-add-wrap { display: flex; gap: 6px; flex: 1; min-width: 220px; }
+.dc-add-wrap input { flex: 1; }
+.dc-find { width: 180px; }
+.dc-count { align-self: center; color: var(--text-3); font-size: 12px; margin-right: 6px; }
+.dc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; max-height: 52vh; overflow-y: auto; padding: 2px; }
+.dc-row { display: flex; align-items: center; gap: 2px; padding: 2px 2px 2px 4px; border-radius: 8px; background: var(--fill); }
+.dc-row:focus-within { box-shadow: 0 0 0 1.5px var(--accent); background: var(--surface); }
+.dc-word { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 13px; padding: 5px 6px; color: var(--text); }
+.dc-word:focus { outline: none; }
+.dc-row .icon-btn { opacity: .5; }
+.dc-row:hover .icon-btn, .dc-row:focus-within .icon-btn { opacity: 1; }
+.dc-empty { grid-column: 1 / -1; }
+/* Spelling & Grammar Rules */
+.rl { display: flex; flex-direction: column; gap: 10px; }
+.rl-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: sticky; top: -20px; z-index: 2; margin: 0 -22px; padding: 10px 22px; background: var(--surface); box-shadow: 0 1px 0 var(--sep); }
+.rl-find { width: 220px; }
+.rl-summary { font-size: 12px; color: var(--text-3); }
+.rl-groups { display: flex; flex-direction: column; gap: 8px; }
+.rl-group { border-radius: 12px; background: var(--fill); padding: 4px; }
+.rl-group.off .rl-gname b { color: var(--text-3); }
+.rl-ghead { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
+.rl-gall { display: inline-flex; align-items: center; }
+.rl-gname { flex: 1; display: flex; align-items: flex-start; gap: 6px; border: 0; background: transparent; text-align: left; color: var(--text); padding: 4px 0; cursor: pointer; }
+.rl-gname .sb-disc { margin-top: 2px; }
+.rl-gname b { display: block; font-size: 13.5px; }
+.rl-gname small { display: block; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.rl-gcount { font-size: 11.5px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 9px; background: var(--surface); white-space: nowrap; }
+.rl-rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px; padding: 4px 6px 8px 30px; }
+.rl-rule { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--surface); font-size: 12.5px; cursor: pointer; }
+.rl-rule input { margin-top: 2px; }
+.rl-rule b { display: block; font-weight: 600; }
+.rl-rule.changed { box-shadow: inset 3px 0 0 var(--accent); }
+.rl-choice { align-items: center; justify-content: space-between; cursor: default; }
+.rl-choice select { flex: none; max-width: 180px; }
+.rl-desc { display: block; color: var(--text-3); line-height: 1.4; }
+.rl-desc code { font-size: 11.5px; padding: 0 3px; border-radius: 4px; background: var(--fill); }
+/* Settings docks at the right, with the app undimmed beside it, so skin, contrast and text size
+   changes are easy to see. */
+.overlay.side { justify-content: flex-end; align-items: stretch; padding: 46px 10px 10px; }
+.overlay.side.in { background: transparent; }
+.sheet.side { width: min(560px, 46vw); max-width: none; max-height: none; height: 100%; transform: translateX(16px); box-shadow: -12px 0 40px -12px rgba(0, 0, 0, .35), 0 0 0 .5px var(--sep-strong); }
+.overlay.side.in .sheet.side { transform: none; }
+.sheet.side .skin-grid { grid-template-columns: repeat(4, 1fr); }
+@media (prefers-reduced-motion: reduce) { .sheet.side { transform: none; } }

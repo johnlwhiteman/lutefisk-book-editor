@@ -15,15 +15,24 @@ Lutefisk Book Editor puts your manuscript and the finished book side by side. Yo
 | | |
 |---|---|
 | **Write** | Paragraph styles, text color, highlighting, lists, tables, pictures, drawings, LaTeX formulas, code, footnotes, citations and margin comments |
-| **Organize** | Chapters and scenes, front and back matter, labels, statuses, search and replace, and a Recycle Bin |
-| **Check** | Spelling, grammar and style checked as you type, on your computer |
+| **Organize** | A binder with numbered chapters and scenes, front and back matter, labels, statuses, search and replace, and a Recycle Bin |
+| **Check** | Spelling, grammar and style checked as you type, on your computer, with your own dictionary and rules you choose |
 | **Preview** | Kindle, Kobo, Nook, iPhone, iPad and Android devices drawn to scale, and the printed book as an open spread |
-| **Design** | About 95 templates, drop caps, ornaments, trim sizes, papers and a watermark |
-| **Plan** | Research notes, files and index cards, a bibliography, characters, a plot board and a timeline |
-| **Track** | Daily and book goals, a writing history and Insights on your text |
+| **Design** | About 95 templates, drop caps, ornaments, trim sizes, artwork papers and a watermark |
+| **Plan** | Research notes and files, index cards, a bibliography in four citation styles, characters, a plot board and a timeline |
+| **Track** | Goals your way (or none at all), the routines of famous writers, a writing history and Insights |
+| **Make it yours** | Twelve skins, text size up to 200%, four levels of contrast and 16 interface languages |
 | **Export** | EPUB 3, PDF, Word (.docx), RTF, MOBI, Markdown and plain text |
 
 ## A tour
+
+### Start a book
+
+**New Book** asks for a title, an optional subtitle, the author, a genre and a **logline**: what the book is about, in one or two sentences. Each new book gets its own cover color in the Library. When you upload a front or back cover, you see it as a book, with its size, before you decide to use it.
+
+### Organize
+
+The binder keeps **Front Matter**, **Body** and **Back Matter** on separate cards. Chapters are numbered, scenes hang beneath their chapter, and the part you're writing is highlighted. Right-click a chapter or scene to add one before or after it, give it a label or a status, or exclude it from the book.
 
 ### Write
 
@@ -31,13 +40,13 @@ The toolbar has paragraph styles (headings, block quote, verse, hanging indent, 
 
 ![The formatting toolbar below the text](docs/screenshots/toolbar-bottom.png)
 
-Right-click in the text for comments, index cards, characters and the same **Insert** items. Right-click a title for **Capitalize My Title**.
+Right-click in the text for comments, index cards and characters, and the same **Insert** items as the + menu, in the same order. Right-click a title for **Capitalize My Title**.
 
 <p align="center"><img src="docs/screenshots/rightclick.png" alt="The right-click menu" width="470"></p>
 
 ### Check spelling and grammar
 
-Problems are highlighted as you type: spelling in red, grammar in blue and style in purple. Right-click a highlighted word for suggestions, **Add to Dictionary** or **Ignore**. The **Spelling** and **Grammar** buttons above the text turn checking on and off.
+Problems are highlighted as you type: spelling in red, grammar in blue and style in purple. Right-click a highlighted word for suggestions, **Add to Dictionary** or **Ignore**. The **Spelling** and **Grammar** buttons above the text turn checking on and off. In **Settings › Spelling & Grammar**, choose American, British, Canadian or Australian English, edit **your dictionary** (add, find, correct or remove words), and **choose the rules** the checker uses: turn whole groups on or off, such as Style and Redundancy or Word Choice, or single rules like the Oxford comma or avoiding contractions.
 
 <p align="center"><img src="docs/screenshots/live.png" alt="Spelling and grammar highlighted in the text" width="470"></p>
 
@@ -73,13 +82,13 @@ Click the template name beside the device. Point at a design to see it on the de
 
 ### Research
 
-**Research** is the book's notebook: Markdown notes with a live preview, uploaded pictures and documents, and index cards. To turn a passage into an index card, select it and right-click › **New Index Card**. Characters, the plot board, the timeline and the bibliography open from here too. Nothing in Research is printed.
+**Research** is the book's notebook. Write notes on the left and see them on the right. **Upload Files…** keeps pictures, PDFs and documents with the book; they appear as tiles under your notes, and a picture goes into your notes only when you choose **Insert into Notes**. **Index Cards** lays your cards out like cards on a desk: drag them into order, or select a passage in your text and right-click › **New Index Card**. Characters, the plot board, the timeline and the bibliography open from the same row. Nothing in Research is printed.
 
 ![The Research window](docs/screenshots/research.png)
 
 ### Cite your sources
 
-In the **Bibliography**, choose **Add New Source**, paste a link or DOI and press **Analyze** to fill in the title, authors and date. Sources are formatted in APA, MLA, Chicago or IEEE; choosing a style shows its rules and examples before you apply it. Insert a citation with right-click › **Insert › Citation…**.
+The **Bibliography** lists your sources. Choose **Add New Source**, paste a link or DOI and press **Analyze** to fill in the title, authors and date; the fields your citation style needs are marked. Pick **APA**, **MLA**, **Chicago** or **IEEE** to read that style's rules with examples, then apply it to the whole book when you're ready. Insert a citation with right-click › **Insert › Citation…**; with no sources yet, Lutefisk Book Editor helps you add one first.
 
 ### Plan the story
 
@@ -90,13 +99,19 @@ Keep a cast of characters with portraits, and see the chapters each one appears 
   <img src="docs/screenshots/timeline.png" alt="The story timeline" width="49%">
 </p>
 
-### Set goals
+### Set goals, or don't
 
-Set a goal for the whole book and one for each day, in words, pages or hours. A countdown shows the time left before your deadline.
+Goals are optional. Leave them on and every book starts with a default you can change (80,000 words in a year, and 2,000 words a day); turn them off in **Settings › Writing Goals** (or **Turn Goals Off** in the Goals window) and they disappear from the binder and the status bar.
+
+- **A book goal** in words or pages, and/or total hours, with a start date, a deadline and a live countdown that tells you how much a day finishes on time.
+- **A daily goal** in words or pages, and/or hours of writing. A stopwatch you start and stop yourself keeps the time.
+- **Your own daily goals**, beyond counting: *take a walk before writing*, *reread yesterday's pages*, *no phone until 500 words*. Tick them off each day, in the Goals window or from the Today meter under the editor.
+- **Write like…** a famous writer: use Stephen King's six pages, J.K. Rowling's six to eight hours, Virginia Woolf's two and a half hours, Lee Child's 2,000 words, Mark Twain's 1,500 words or Dorothy Parker's five words, each with a note on how they worked. Their habits, such as King's long walk, join your own goals. Edit any of them, or **Add Author** to save the routine of a writer you admire.
+- **Notes** on each goal: why it matters, what "done" means, a reward for getting there.
 
 ![Book and daily goals](docs/screenshots/goals.png)
 
-Charts show your words per day, the book's size and your writing time.
+Your writing history shows words per day against your goal, writing days and streaks, your best day, the book's size and your time, over 30 days, 90 days or a year.
 
 ![Your writing history](docs/screenshots/goals-history.png)
 
@@ -106,13 +121,20 @@ Word counts, reading time, readability, sentence length, active and passive voic
 
 ![Insights](docs/screenshots/insights.png)
 
+### Make it yours
+
+- **Skins:** Classic, High Contrast, and ten that carry a faint pattern from a textile, tile or craft tradition (Batik, Seigaiha, Washi, Talavera, Bògòlan, Kuba, Kōwhaiwhai, Greek Key, Selbu and Andean), each with a day and a night version.
+- **Text size:** Default, Large, Larger, Largest or Extra Large (200%) for every word and control in the window.
+- **Contrast:** Softer, Standard, Stronger or Strongest, with any skin.
+- **Comfort:** an easier-to-read font (Atkinson Hyperlegible), relaxed line spacing, a bold focus ring and reduced motion.
+- **16 interface languages.**
+
+All of these are in **Settings › Appearance** and **Settings › Vision & Comfort**, and skin, text size, contrast and day or night are also in the **View** menu.
+
 ### More
 
-- **Day and night** themes and 14 skins.
-- **Vision and comfort:** larger interface text, an easier-to-read font, stronger contrast and reduced motion.
-- **16 interface languages.**
 - **Focus mode** for the editor and the preview.
-- **Back Up** a book as a .zip (⇧⌘S).
+- **Back Up** a book as a .zip (⇧⌘S). Pictures you delete from the text are cleared from the book's folder when you close it.
 - **Help and a guided tour:** press F1.
 
 ## Getting started

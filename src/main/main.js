@@ -252,7 +252,7 @@ function createWindow() {
   if (!MAC) nativeTheme.on('updated', () => { try { win?.setTitleBarOverlay(overlay()); } catch { /* not supported */ } });
   win.webContents.on('did-finish-load', async () => {
     const z = Number((await readPrefs()).uiZoom);
-    if (z >= 0.9 && z <= 2) win?.webContents.setZoomFactor(z);
+    if (z >= 0.9 && z <= 2) win?.webContents.setZoomFactor(nearestStep(z));
   });
   win.once('ready-to-show', () => win.show());
   win.loadURL('app://lutefisk/index.html');
@@ -268,7 +268,18 @@ function createWindow() {
 }
 
 /* Interface size (whole window), remembered between launches. */
-const UI_STEPS = [0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.8, 2];
+/** Rule choices: only names that look like Harper's (letters and digits), only true/false, at most 2,000. */
+function cleanRules(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(r).slice(0, 2000)) if (/^[A-Za-z][A-Za-z0-9]{0,79}$/.test(k) && typeof v === 'boolean') out[k] = v;
+  return out;
+}
+const UI_STEPS = [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+// Text size presets (Settings › Vision & Comfort and View › Text Size): the whole window's zoom.
+const TEXT_SIZES = [[1, 'Default'], [1.25, 'Large'], [1.5, 'Larger'], [1.75, 'Largest'], [2, 'Extra Large']];
+const nearestStep = (z) => UI_STEPS.reduce((a, b) => (Math.abs(b - z) < Math.abs(a - z) ? b : a), 1);
+const CONTRASTS = [[-1, 'Softer'], [0, 'Standard'], [1, 'Stronger'], [2, 'Strongest']];
 const prefsFile = () => path.join(app.getPath('userData'), 'prefs.json');
 async function readPrefs() { try { return JSON.parse(await fs.readFile(prefsFile(), 'utf8')); } catch { return {}; } }
 async function writePrefs(p) { await fs.writeFile(prefsFile(), JSON.stringify(p, null, 2), { mode: 0o600 }).catch(() => {}); }
@@ -276,7 +287,7 @@ let closeTimer = null;
 
 /* App settings the user controls. Paths are only ever set through a folder chooser. */
 const SETTINGS_DEFAULTS = { autosave: true, autosaveSeconds: 5, rememberLastDir: true, theme: 'system', skin: 'classic', a11yFont: false, a11yContrast: false, a11yMotion: false, a11yFocus: false, a11ySpacing: 'normal', uiZoom: 1, spellDialect: 'american', uiLanguage: 'en-US', spellStyle: true, dictionary: [], goalsOn: true, goalAuthors: null, customGenres: [], toolbarPos: 'top', paneOrder: ['binder', 'editor', 'preview'], editorFont: '', editorFontSync: false, sentenceSpacing: 'one' };
-const SKINS = ['classic', 'paper', 'typewriter', 'linen', 'leather', 'study', 'blueprint', 'midnight', 'fjord', 'forest', 'rose', 'lavender', 'graphite', 'contrast'];
+const SKINS = ['classic', 'batik', 'seigaiha', 'washi', 'talavera', 'mudcloth', 'kuba', 'koru', 'meander', 'selbu', 'andean', 'contrast'];
 function cleanSettings(p) {
   const secs = Number(p.autosaveSeconds);
   return {
@@ -294,9 +305,13 @@ function cleanSettings(p) {
     a11yMotion: p.a11yMotion === true,
     a11yFocus: p.a11yFocus === true,
     a11ySpacing: ['normal', 'relaxed', 'loose'].includes(p.a11ySpacing) ? p.a11ySpacing : 'normal',
-    uiZoom: UI_STEPS.includes(Number(p.uiZoom)) ? Number(p.uiZoom) : 1,
+    uiZoom: Number.isFinite(Number(p.uiZoom)) && Number(p.uiZoom) > 0 ? nearestStep(Number(p.uiZoom)) : 1,
+    // Contrast: -1 softer, 0 standard, 1 stronger, 2 strongest (the old "Stronger contrast" box = 1).
+    contrast: [-1, 0, 1, 2].includes(Number(p.contrast)) && p.contrast !== null && p.contrast !== '' ? Number(p.contrast) : (p.a11yContrast === true ? 1 : 0),
     // Spelling and grammar (Harper, local).
-    spellDialect: ['american', 'british', 'canadian', 'australian', 'indian'].includes(p.spellDialect) ? p.spellDialect : 'american',
+    spellDialect: ['american', 'british', 'canadian', 'australian'].includes(p.spellDialect) ? p.spellDialect : 'american',
+    // Spelling and grammar rules you've turned on or off: { RuleName: true|false } (the rest keep Harper's defaults).
+    lintRules: cleanRules(p.lintRules),
     // Live checking, as you type, for spelling and for grammar (older settings: spellOn / spellMode / spellGrammar).
     spellLive: p.spellLive !== undefined ? !!p.spellLive : p.spellOn !== false && p.spellMode !== 'manual',
     grammarLive: p.grammarLive !== undefined ? !!p.grammarLive : p.spellOn !== false && p.spellMode !== 'manual' && p.spellGrammar !== false,
@@ -327,9 +342,28 @@ async function uiZoom(dir) {
   const prefs = await readPrefs();
   prefs.uiZoom = next;
   await fs.writeFile(prefsFile(), JSON.stringify(prefs), { mode: 0o600 }).catch(() => {});
+  menuLook.uiZoom = next; buildMenu();
+  win.webContents.send('menu', 'ui-zoom-changed');
 }
 
 function send(cmd) { return () => win?.webContents.send('menu', cmd); }
+
+// View › Appearance and View › Skin show the current choice (kept here so the menu can be rebuilt).
+const SKIN_NAMES = { classic: 'Classic', batik: 'Batik', seigaiha: 'Seigaiha', washi: 'Washi', talavera: 'Talavera', mudcloth: 'Bògòlan', kuba: 'Kuba', koru: 'Kōwhaiwhai', meander: 'Greek Key', selbu: 'Selbu', andean: 'Andean', contrast: 'High Contrast' };
+const menuLook = { skin: 'classic', theme: 'system', uiZoom: 1, contrast: 0 };
+const lookMenus = () => [
+  { label: t('Appearance'), submenu: [['system', 'System'], ['light', 'Day'], ['dark', 'Night']].map(([id, name]) => ({ label: t(name), type: 'radio', checked: menuLook.theme === id, click: send(`theme:${id}`) })) },
+  { label: t('Skin'), submenu: SKINS.map((id) => ({ label: t(SKIN_NAMES[id] || id), type: 'radio', checked: menuLook.skin === id, click: send(`skin:${id}`) })) },
+  { label: t('Contrast'), submenu: CONTRASTS.map(([v, name]) => ({ label: t(name), type: 'radio', checked: menuLook.contrast === v, click: send(`contrast:${v}`) })) },
+];
+// View › Text Size: the presets, then a step larger or smaller (with the shortcuts).
+const textSizeMenu = () => ({ label: t('Text Size'), submenu: [
+  ...TEXT_SIZES.map(([z, name]) => ({ label: `${t(name)} (${Math.round(z * 100)}%)`, type: 'radio', checked: Math.abs(menuLook.uiZoom - z) < 0.001, click: send(`size:${z}`) })),
+  { type: 'separator' },
+  { label: t('Larger Text'), accelerator: 'CmdOrCtrl+Shift+=', click: () => uiZoom(1) },
+  { label: t('Smaller Text'), accelerator: 'CmdOrCtrl+Shift+-', click: () => uiZoom(-1) },
+  { label: t('Default Text Size'), accelerator: 'CmdOrCtrl+Shift+0', click: () => uiZoom(0) },
+] });
 
 function buildMenu() {
   const mac = process.platform === 'darwin';
@@ -374,9 +408,8 @@ function buildMenu() {
         { label: t('Zoom Out Text'), accelerator: 'CmdOrCtrl+-', click: send('zoom-out') },
         { label: t('Actual Text Size'), accelerator: 'CmdOrCtrl+0', click: send('zoom-reset') },
         { type: 'separator' },
-        { label: t('Larger Interface'), accelerator: 'CmdOrCtrl+Shift+=', click: () => uiZoom(1) },
-        { label: t('Smaller Interface'), accelerator: 'CmdOrCtrl+Shift+-', click: () => uiZoom(-1) },
-        { label: t('Default Interface Size'), accelerator: 'CmdOrCtrl+Shift+0', click: () => uiZoom(0) },
+        textSizeMenu(),
+        ...lookMenus(),
         { type: 'separator' },
         { label: t('Focus on Writing'), accelerator: 'CmdOrCtrl+Shift+F', click: send('focus-mode') },
         { label: t('Focus on Preview'), accelerator: 'CmdOrCtrl+Alt+P', click: send('toggle-preview') },
@@ -412,7 +445,7 @@ function registerIpc() {
   handle('settings:set', async (patch = {}) => {
     const prefs = await readPrefs();
     // Paths can't be set from the window, only through the choosers below.
-    for (const k of ['autosave', 'autosaveSeconds', 'rememberLastDir', 'theme', 'skin', 'a11yFont', 'a11yContrast', 'a11yMotion', 'a11yFocus', 'a11ySpacing', 'uiZoom', 'spellLive', 'grammarLive', 'spellDialect', 'uiLanguage', 'spellStyle', 'dictionary', 'goalsOn', 'goalAuthors', 'customGenres', 'toolbarPos', 'paneOrder', 'editorFont', 'editorFontSync', 'sentenceSpacing']) if (k in patch) prefs[k] = patch[k];
+    for (const k of ['autosave', 'autosaveSeconds', 'rememberLastDir', 'theme', 'skin', 'a11yFont', 'a11yContrast', 'contrast', 'a11yMotion', 'a11yFocus', 'a11ySpacing', 'uiZoom', 'spellLive', 'grammarLive', 'lintRules', 'spellDialect', 'uiLanguage', 'spellStyle', 'dictionary', 'goalsOn', 'goalAuthors', 'customGenres', 'toolbarPos', 'paneOrder', 'editorFont', 'editorFontSync', 'sentenceSpacing']) if (k in patch) prefs[k] = patch[k];
     if (patch.resetLibraryDir) { delete prefs.libraryDir; customLibrary = ''; }
     if (patch.rememberLastDir === false) delete prefs.lastDir;
     Object.assign(prefs, cleanSettings({ ...SETTINGS_DEFAULTS, ...prefs }));
@@ -420,7 +453,10 @@ function registerIpc() {
     const clean = cleanSettings(prefs);
     if ('theme' in patch) applyTheme(clean.theme);
     if ('uiZoom' in patch && win) win.webContents.setZoomFactor(clean.uiZoom);
-    if ('uiLanguage' in patch) { setLanguage(clean.uiLanguage); buildMenu(); }
+    if ('uiLanguage' in patch) setLanguage(clean.uiLanguage);
+    const look = ['skin', 'theme', 'uiZoom', 'contrast'].some((k) => k in patch);
+    if (look) Object.assign(menuLook, { skin: clean.skin, theme: clean.theme, uiZoom: clean.uiZoom, contrast: clean.contrast });
+    if ('uiLanguage' in patch || look) buildMenu();
     return clean;
   });
   handle('settings:chooseDir', async (which) => {
@@ -1106,7 +1142,12 @@ if (!app.requestSingleInstanceLock()) {
     registerProtocols();
     registerIpc();
     buildMenu();
-    readPrefs().then((p) => { if (p.uiLanguage && p.uiLanguage !== 'en-US') { setLanguage(p.uiLanguage); buildMenu(); } }).catch(() => {});
+    readPrefs().then((p) => {
+      const c = cleanSettings({ ...SETTINGS_DEFAULTS, ...p });
+      Object.assign(menuLook, { skin: c.skin, theme: c.theme, uiZoom: c.uiZoom, contrast: c.contrast });
+      if (c.uiLanguage && c.uiLanguage !== 'en-US') setLanguage(c.uiLanguage);
+      buildMenu();
+    }).catch(() => {});
     createWindow();
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) { allowClose = false; createWindow(); } });
   });

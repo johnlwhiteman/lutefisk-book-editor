@@ -2,7 +2,9 @@
 // remember the last folder. Stored by the main process in the app's own data
 // folder (never in a project or in the app's source).
 import { applyLanguage } from './i18n-dom.js';
-import { LANGUAGES } from '../shared/i18n.js';
+import { installSkinArt } from './skin-art.js';
+import { openDictionary, openRules } from './proof-settings.js';
+import { LANGUAGES, t, getLanguage } from '../shared/i18n.js';
 import { h, icon, toast, segmented, dialog } from './ui.js';
 import { FONTS, fontStack } from '../shared/fonts.js';
 
@@ -13,28 +15,28 @@ const listeners = new Set();
 /** Skins: the look of the app (never the book). Each has a day and a night version. */
 export const SKINS = [
   { id: 'classic', name: 'Classic', about: 'Clean and simple', day: ['#f5f5f7', '#007aff'], night: ['#1c1c1e', '#0a84ff'] },
-  { id: 'paper', name: 'Paper', about: 'Warm parchment with a paper grain', tex: 'grain', day: ['#f4eee2', '#a0522d'], night: ['#211c16', '#d4895a'] },
-  { id: 'typewriter', name: 'Typewriter', about: 'Cream paper, ribbon red and typewriter type', tex: 'grain', day: ['#f3efe4', '#b3261e'], night: ['#1d1b18', '#ff6b5e'] },
-  { id: 'linen', name: 'Linen', about: 'Woven fabric and blue-gray ink', tex: 'linen', day: ['#efede7', '#4a6a8a'], night: ['#1b1c1e', '#8fb3d6'] },
-  { id: 'leather', name: 'Leather', about: 'A stitched leather binder with brass accents', tex: 'leather', day: ['#5a3a24', '#d9a35e'], night: ['#3a2618', '#d9a35e'] },
-  { id: 'study', name: 'Study', about: 'Your book on a walnut desk', tex: 'wood', day: ['#6b4a33', '#f1ece4'], night: ['#2b1d13', '#c9935f'] },
-  { id: 'blueprint', name: 'Blueprint', about: 'A drafting-table grid', tex: 'grid', day: ['#eef3fa', '#1f5fbf'], night: ['#0f2747', '#7cc4ff'] },
-  { id: 'midnight', name: 'Midnight', about: 'Deep navy and a field of stars at night', tex: 'stars', day: ['#eef0f7', '#4b4fd1'], night: ['#0b0e1d', '#a8a5ff'] },
-  { id: 'fjord', name: 'Fjord', about: 'Cool slate and sea blue', day: ['#eef2f5', '#0f7b8a'], night: ['#141c22', '#38b2c2'] },
-  { id: 'forest', name: 'Forest', about: 'Sage and pine', day: ['#eff2ec', '#2f7d4f'], night: ['#151b16', '#5fbf84'] },
-  { id: 'rose', name: 'Rose', about: 'Blush and berry', day: ['#f8f0f2', '#c2185b'], night: ['#1f1619', '#f06292'] },
-  { id: 'lavender', name: 'Lavender', about: 'Soft violet', day: ['#f2f0f8', '#6b4fc4'], night: ['#18161f', '#9f87ff'] },
-  { id: 'graphite', name: 'Graphite', about: 'Quiet monochrome', day: ['#f1f1f1', '#3d3d42'], night: ['#161616', '#d0d0d4'] },
-  { id: 'contrast', name: 'High Contrast', about: 'Strong contrast for easier reading', day: ['#ffffff', '#0040c1'], night: ['#000000', '#6cb4ff'] },
+  { id: 'batik', name: 'Batik', about: 'Java — indigo and soga brown, the kawung pattern', tex: 'batik', day: ['#efe6d6', '#7a4316'], night: ['#1a1510', '#e2a65c'] },
+  { id: 'seigaiha', name: 'Seigaiha', about: 'Japan — indigo ocean waves', tex: 'seigaiha', day: ['#e9eef5', '#1f4e8c'], night: ['#111b2c', '#7fb2ff'] },
+  { id: 'washi', name: 'Washi', about: 'Japan — fibered paper, sumi ink and a vermilion seal', tex: 'washi', day: ['#f1ece2', '#c0392b'], night: ['#1a1917', '#ff6b55'] },
+  { id: 'talavera', name: 'Talavera', about: 'Mexico — cobalt tile with a touch of saffron', tex: 'talavera', day: ['#eef2f8', '#1f4e9c'], night: ['#0f1830', '#8fb0ff'] },
+  { id: 'mudcloth', name: 'Bògòlan', about: 'Mali — mud cloth in earth brown and cream', tex: 'mudcloth', day: ['#e8dcc6', '#8a4b1c'], night: ['#241a12', '#e0a25f'] },
+  { id: 'kuba', name: 'Kuba', about: 'Congo — raffia cloth and dark brown', tex: 'kuba', day: ['#eadfc6', '#8d5a17'], night: ['#1f190f', '#d9b25c'] },
+  { id: 'koru', name: 'Kōwhaiwhai', about: 'Aotearoa — red ochre, black and white koru', tex: 'koru', day: ['#f1ece6', '#a4281b'], night: ['#161211', '#e86a55'] },
+  { id: 'meander', name: 'Greek Key', about: 'Greece — terracotta and black, like Attic pottery', tex: 'meander', day: ['#efe3d4', '#9c4320'], night: ['#17110d', '#e8955f'] },
+  { id: 'selbu', name: 'Selbu', about: 'Norway — red and white knitting stars', tex: 'selbu', day: ['#f1eeea', '#b3202a'], night: ['#181416', '#ff7b7b'] },
+  { id: 'andean', name: 'Andean', about: 'Peru and Bolivia — woven steps in red, ochre and indigo', tex: 'andean', day: ['#efe5d8', '#a33a1f'], night: ['#1b130e', '#f08a4b'] },
+  { id: 'contrast', name: 'High Contrast', about: 'Strong contrast for the easiest reading', day: ['#ffffff', '#0040c1'], night: ['#000000', '#6cb4ff'] },
 ];
-export const applySkin = (id) => { document.documentElement.dataset.skin = SKINS.some((s) => s.id === id) ? id : 'classic'; };
+export const applySkin = (id) => { installSkinArt(); document.documentElement.dataset.skin = SKINS.some((s) => s.id === id) ? id : 'classic'; };
 export const setSkin = (skin) => { applySkin(skin); return update({ skin }); };
 
 /** Vision and comfort settings, applied to the whole window. */
 export function applyA11y(st = settings) {
   const d = document.documentElement.dataset;
   d.a11yFont = st.a11yFont ? 'on' : '';
-  d.a11yContrast = st.a11yContrast ? 'on' : '';
+  // Contrast: -1 softer, 0 standard, 1 stronger, 2 strongest (older settings: the a11yContrast box).
+  const c = Number.isInteger(st.contrast) ? st.contrast : st.a11yContrast ? 1 : 0;
+  d.contrast = { '-1': 'soft', 1: 'strong', 2: 'max' }[c] || '';
   d.a11yMotion = st.a11yMotion ? 'reduce' : '';
   d.a11yFocus = st.a11yFocus ? 'on' : '';
   d.a11ySpacing = st.a11ySpacing && st.a11ySpacing !== 'normal' ? st.a11ySpacing : '';
@@ -130,12 +132,11 @@ function spellSection(draw) {
     box.addEventListener('change', () => update({ [key]: box.checked }).then(draw));
     return h('label', { class: 'st-check a11y-check' }, box, h('span', {}, h('b', {}, label), hint ? h('small', { class: 'hint' }, hint) : null));
   };
-  const dialect = h('select', { 'aria-label': 'English dialect' }, [['american', 'American'], ['british', 'British'], ['canadian', 'Canadian'], ['australian', 'Australian'], ['indian', 'Indian']].map(([v, l]) => h('option', { value: v }, l)));
+  const dialect = h('select', { 'aria-label': 'English dialect' }, [['american', 'American'], ['british', 'British'], ['canadian', 'Canadian'], ['australian', 'Australian']].map(([v, l]) => h('option', { value: v }, l)));
   dialect.value = settings.spellDialect || 'american';
   dialect.addEventListener('change', () => update({ spellDialect: dialect.value }).then(draw));
   const dict = settings.dictionary || [];
-  const add = h('input', { type: 'text', placeholder: 'Add a word…', 'aria-label': 'Add a word to your dictionary', maxlength: 64, class: 'dict-add' });
-  add.addEventListener('keydown', (e) => { if (e.key === 'Enter' && add.value.trim()) { e.preventDefault(); update({ dictionary: [...dict, add.value.trim()] }).then(draw); } });
+  const changed = Object.keys(settings.lintRules || {}).length;
   return h('section', { class: 'st-sec' },
     h('div', { class: 'st-ic' }, icon('check', 18)),
     h('div', { class: 'st-main' },
@@ -146,8 +147,12 @@ function spellSection(draw) {
         check('grammarLive', 'Check grammar as I type', 'Agreement, word choice, punctuation and more — underlined in blue.'),
         h('label', { class: 'st-row' }, h('span', {}, 'English'), dialect),
         check('spellStyle', 'Include style suggestions with grammar', 'Wordiness, repetition and readability — dotted in purple.'),
-        h('div', { class: 'fld' }, h('span', {}, `Your dictionary${dict.length ? ` (${dict.length})` : ''}`), add,
-          dict.length ? h('div', { class: 'dict-list' }, dict.map((w) => h('span', { class: 'dict-word' }, w, h('button', { type: 'button', 'aria-label': `Remove ${w}`, title: 'Remove', onclick: () => update({ dictionary: dict.filter((x) => x !== w) }).then(draw) }, icon('close', 10))))) : h('small', { class: 'hint' }, 'Names and invented words you add here aren’t marked as misspelled.')))));
+        h('div', { class: 'st-row st-proof' }, h('span', {}, 'Your dictionary'),
+          h('span', { class: 'st-proof-sum' }, dict.length ? `${dict.length} word${dict.length === 1 ? '' : 's'}` : 'No words yet'),
+          h('button', { type: 'button', class: 'btn small', onclick: () => openDictionary(sheetFn, { get: () => settings.dictionary || [], save: (list) => update({ dictionary: list }).then(draw) }) }, icon('pen', 13), 'Edit Dictionary…')),
+        h('div', { class: 'st-row st-proof' }, h('span', {}, 'Rules'),
+          h('span', { class: 'st-proof-sum' }, changed ? `${changed} changed by you` : 'Harper’s defaults'),
+          h('button', { type: 'button', class: 'btn small', onclick: () => openRules(sheetFn, { get: () => settings.lintRules || {}, save: (r) => update({ lintRules: r }), dialect: settings.spellDialect || 'american' }) }, icon('check', 13), 'Choose Rules…')))));
 }
 
 /** Settings › Goals: show or hide writing goals everywhere. */
@@ -177,26 +182,31 @@ function languageSection(draw) {
       sel.value === 'lkt' ? h('p', { class: 'hint' }, 'Lakȟótiyapi is just beginning: a few words are in place and the rest shows in English until fluent speakers contribute translations.') : null));
 }
 
-/** Settings › Vision & Comfort: larger interface, an easier-to-read font, stronger contrast, calmer motion. */
+/** Settings › Vision & Comfort: text size, contrast, an easier-to-read font, calmer motion. */
 function a11ySection(draw) {
   const check = (key, label, hint) => {
     const box = h('input', { type: 'checkbox', checked: !!settings[key] });
     box.addEventListener('change', () => update({ [key]: box.checked }).then(draw));
     return h('label', { class: 'st-check a11y-check' }, box, h('span', {}, h('b', {}, label), h('small', { class: 'hint' }, hint)));
   };
-  const sizes = [[0.9, '90%'], [1, '100%'], [1.1, '110%'], [1.25, '125%'], [1.4, '140%'], [1.6, '160%'], [1.8, '180%'], [2, '200%']];
+  // Text size: the whole window, in a few clear steps (⇧⌘+ / ⇧⌘− go between them, and 90% and 110%).
+  const sizes = [[1, 'Default', '100%'], [1.25, 'Large', '125%'], [1.5, 'Larger', '150%'], [1.75, 'Largest', '175%'], [2, 'Extra Large', '200%']];
+  const zoom = Number(settings.uiZoom) || 1;
+  const contrast = Number.isInteger(settings.contrast) ? settings.contrast : settings.a11yContrast ? 1 : 0;
   return h('section', { class: 'st-sec' },
     h('div', { class: 'st-ic' }, icon('eye', 18)),
     h('div', { class: 'st-main' },
       h('h3', {}, 'Vision & Comfort'),
-      h('label', { class: 'st-row' }, h('span', {}, 'Interface size'),
-        (() => {
-          const sel = h('select', { 'aria-label': 'Interface size' }, sizes.map(([v, l]) => h('option', { value: String(v) }, l)));
-          sel.value = String(settings.uiZoom || 1);
-          sel.addEventListener('change', () => update({ uiZoom: Number(sel.value) }).then(draw));
-          return sel;
-        })(),
-        h('small', { class: 'hint' }, '⇧⌘+ / ⇧⌘− also work. The editor and previews have their own text size.')),
+      h('div', { class: 'st-row st-row-wide' }, h('span', {}, 'Text size'),
+        h('div', { class: 'size-steps', role: 'radiogroup', 'aria-label': 'Text size' }, sizes.map(([v, label, pct], i) => {
+          const on = Math.abs(zoom - v) < 0.001;
+          return h('button', { type: 'button', class: `size-step${on ? ' on' : ''}`, role: 'radio', 'aria-checked': String(on), title: `${label} — ${pct}`, onclick: () => update({ uiZoom: v }).then(draw) },
+            h('span', { class: 'size-a', style: { fontSize: `${12 + i * 3}px` } }, 'A'), h('span', { class: 'size-name' }, label), h('small', {}, pct));
+        })),
+        h('small', { class: 'hint' }, `Makes all the words and controls in the window larger. Also in View › Text Size, or ${B.platform === 'darwin' ? '⇧⌘+ and ⇧⌘−' : 'Ctrl+Shift+Plus and Ctrl+Shift+Minus'}. The editor and the previews have their own text size as well.${[1, 1.25, 1.5, 1.75, 2].some((v) => Math.abs(zoom - v) < 0.001) ? '' : ` Now: ${Math.round(zoom * 100)}%.`}`)),
+      h('div', { class: 'st-row st-row-wide' }, h('span', {}, 'Contrast'),
+        segmented([{ value: '-1', label: 'Softer' }, { value: '0', label: 'Standard' }, { value: '1', label: 'Stronger' }, { value: '2', label: 'Strongest' }], String(contrast), (v) => update({ contrast: Number(v) }).then(draw), { label: 'Contrast' }),
+        h('small', { class: 'hint' }, 'Works with every skin. Softer: gentler gray text, for glare. Stronger: darker secondary text, clearer lines and a fainter pattern. Strongest: all text at full strength, bold lines, no pattern and underlined links. The High Contrast skin goes further still.')),
       h('label', { class: 'st-row' }, h('span', {}, 'Formatting toolbar'),
         segmented([{ value: 'top', label: 'Top' }, { value: 'bottom', label: 'Bottom' }], settings.toolbarPos === 'bottom' ? 'bottom' : 'top', (v) => setToolbarPos(v).then(draw), { label: 'Formatting toolbar' })),
       h('label', { class: 'st-row' }, h('span', {}, 'Panel order'),
@@ -225,7 +235,6 @@ function a11ySection(draw) {
       h('label', { class: 'st-row' }, h('span', {}, 'Editor line spacing'),
         segmented([{ value: 'normal', label: 'Normal' }, { value: 'relaxed', label: 'Relaxed' }, { value: 'loose', label: 'Loose' }], settings.a11ySpacing || 'normal', (v) => update({ a11ySpacing: v }).then(draw), { label: 'Editor line spacing' })),
       check('a11yFont', 'Easier-to-read font', 'Uses Atkinson Hyperlegible — designed for low vision — for menus, the binder and the editor. Your book keeps its own fonts.'),
-      check('a11yContrast', 'Stronger contrast', 'Darker secondary text, clearer borders and underlined links. Pairs well with the High Contrast skin.'),
       check('a11yFocus', 'Always show a bold focus ring', 'A thick outline around whatever has keyboard focus, so you never lose your place.'),
       check('a11yMotion', 'Reduce motion', 'Turns off animations and sliding panels.'),
       h('p', { class: 'hint' }, 'Also: the editor text size goes from 25% to 300%; every control has a keyboard shortcut or tooltip; and screen readers can read equations from their LaTeX alt text.')));
@@ -233,7 +242,9 @@ function a11ySection(draw) {
 
 const pretty = (p, home) => (p ? (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p) : '');
 
+let sheetFn = null; // the window maker, for the Dictionary and Rules windows opened from Settings
 export function openSettings(sheet) {
+  sheetFn = sheet;
   const body = h('div', { class: 'settings' });
   const draw = () => {
     const lib = settings.libraryDir || settings.defaultLibraryDir;
@@ -287,9 +298,13 @@ export function openSettings(sheet) {
             h('button', { class: 'btn small', onclick: async () => { const p = await B.chooseSettingsDir('backupDir'); if (p) { settings.backupDir = p; draw(); } } }, 'Change…'),
             settings.backupDir ? h('button', { class: 'btn small plain', onclick: () => B.revealSettingsDir('backupDir') }, 'Show') : null))),
       h('p', { class: 'hint st-foot' }, icon('eye', 13), 'Settings are stored only on this computer, in Lutefisk Book Editor’s own data folder.'));
+    // Sections in alphabetical order of their titles, in the interface language; the note stays last.
+    const title = (sec) => t(sec.querySelector('h3')?.textContent || '');
+    const sections = [...body.querySelectorAll(':scope > .st-sec')].sort((a, b) => title(a).localeCompare(title(b), getLanguage()));
+    body.prepend(...sections);
   };
   draw();
-  sheet('Settings', body);
+  sheet('Settings', body, { side: true });
 }
 
 /**

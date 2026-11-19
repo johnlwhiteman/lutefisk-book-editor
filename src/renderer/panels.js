@@ -69,19 +69,19 @@ export const loglineSentences = (text) => {
   const t = String(text || '').replace(/\b(Mr|Mrs|Ms|Dr|St|Sr|Jr|Prof|Capt|Lt|Gen|Col|Rev|Mt|vs|etc|e\.g|i\.e)\./gi, '$1').replace(/\b[A-Z]\./g, 'X').trim();
   return t ? t.split(/[.!?…]+(?:["”’')\]]*)\s+(?=\S)/).filter((x) => /[\p{L}\p{N}]/u.test(x)).length : 0;
 };
-/** The logline: the story in one or two sentences, with a length meter. New Book won't go on without one. */
+/**
+ * The logline: what the book is about, in one or two sentences, in a box three lines tall.
+ * No word count; the note under it only speaks up past two sentences. New Book won't go on
+ * without one.
+ */
 export function loglineField(b, onChange, { required = false, rows = 3 } = {}) {
   const ta = h('textarea', { rows, class: 'll-main', placeholder: 'What’s the book about?', 'aria-label': 'Logline', 'aria-required': required ? 'true' : null });
   ta.value = b.logline || '';
   const meter = h('small', { class: 'll-meter' });
   const draw = () => {
-    const n = (ta.value.match(/[\p{L}\p{N}’']+/gu) || []).length;
     const sentences = loglineSentences(ta.value);
-    const tone = !n ? '' : sentences > 2 ? 'long' : n < 25 ? 'short' : n <= 50 ? 'good' : 'long';
-    meter.className = `ll-meter ${tone}`;
-    meter.textContent = !n ? 'One or two sentences.'
-      : sentences > 2 ? `${sentences} sentences — keep it to one or two`
-        : `${n} word${n === 1 ? '' : 's'} — ${tone === 'short' ? 'a little short; aim for 25–50' : tone === 'good' ? 'a good length' : 'a little long; aim for 25–50'}`;
+    meter.className = `ll-meter${sentences > 2 ? ' long' : ''}`;
+    meter.textContent = sentences > 2 ? `${sentences} sentences — keep it to one or two` : 'One or two sentences.';
   };
   ta.addEventListener('input', () => { b.logline = ta.value; onChange(); draw(); ta.setCustomValidity(''); });
   draw();
@@ -161,7 +161,7 @@ function select(obj, key, options, onChange) {
 }
 /** Every open window (sheet). */
 const openSheets = new Set();
-export function sheet(title, body, { wide = false, full = false, actions = null, onClose } = {}) {
+export function sheet(title, body, { wide = false, full = false, side = false, actions = null, onClose } = {}) {
   // Esc closes the window wherever the focus is (the top window only, and not
   // while a menu or a dialog on top of it wants the Esc).
   const onEsc = (e) => {
@@ -175,8 +175,9 @@ export function sheet(title, body, { wide = false, full = false, actions = null,
   const close = () => { if (!openSheets.delete(close)) return; document.removeEventListener('keydown', onEsc); overlay.remove(); onClose?.(); };
   openSheets.add(close);
   document.addEventListener('keydown', onEsc);
-  const overlay = h('div', { class: `overlay${full ? ' full' : ''}` },
-    h('div', { class: `sheet${wide ? ' wide' : ''}${full ? ' full' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+  // side: docked at the right with the app undimmed beside it (Settings — so a new skin, text size or contrast shows as you choose).
+  const overlay = h('div', { class: `overlay${full ? ' full' : ''}${side ? ' side' : ''}` },
+    h('div', { class: `sheet${wide ? ' wide' : ''}${full ? ' full' : ''}${side ? ' side' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
       h('header', { class: 'sheet-head' }, h('h2', {}, title), h('div', { class: 'sheet-actions' }, actions, h('button', { class: 'btn primary small', onclick: close }, 'Done'))),
       h('div', { class: 'sheet-body' }, body)));
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });

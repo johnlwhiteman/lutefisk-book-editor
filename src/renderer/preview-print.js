@@ -94,8 +94,10 @@ export function createPrintPreview(host, app) {
     commit: (v) => setPaper(v),
   });
   const artStyle = h('style', {}, artCss());
-  const bar = h('div', { class: 'pv-bar' }, trimPick.button, paperPick.button);
+  // Row 2, as in the e-book preview: the page size, the paper, then the template.
   const tplStrip = templateStrip(app);
+  tplStrip.classList.add('ts-top');
+  const bar = h('div', { class: 'pv-bar' }, trimPick.button, paperPick.button, tplStrip);
   const stage = h('div', { class: 'pp-stage', tabindex: 0, 'aria-label': 'Print preview' });
   const desk = h('div', { class: 'pp-desk' });
   // In preview Focus, the mouse turns pages like a reader: left button back, right button forward.
@@ -124,7 +126,7 @@ export function createPrintPreview(host, app) {
     if (info) go(info.start);
   });
   stageWrap.append(stage, sideL, sideR);
-  host.append(bar, stageWrap, tplStrip, pager, styleEl, artStyle, measure);
+  host.append(bar, stageWrap, pager, styleEl, artStyle, measure);
 
   fontSel.addEventListener('change', () => { P().font = fontSel.value; changed(); });
   // The type grows or shrinks as you drag (each step redraws the pages; drags are coalesced to frames).
