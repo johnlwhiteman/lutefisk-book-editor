@@ -239,9 +239,13 @@ export function ensureSections(book) {
     const def = SECTION_TYPES[type];
     list.push({ id: newId(type.slice(0, 3)), type, enabled: false, ...(def.generated ? { title: defaultTitle(type) } : {}) });
   }
+  // Front and back matter you've put in your own order (by dragging in the binder) keep it:
+  // book.matterOrder lists the groups ('front', 'back') that are yours. Others follow the usual order.
+  const own = new Set(Array.isArray(book.matterOrder) ? book.matterOrder : []);
   const rank = (s) => {
-    const g = GROUPS.findIndex((x) => x.id === SECTION_TYPES[s.type]?.group);
-    if (s.type === 'chapter' || s.type === 'appendix') return g * 1000 + TYPE_ORDER.indexOf(s.type) * 10;
+    const grp = SECTION_TYPES[s.type]?.group;
+    const g = GROUPS.findIndex((x) => x.id === grp);
+    if (own.has(grp)) return g * 1000;
     return g * 1000 + TYPE_ORDER.indexOf(s.type) * 10;
   };
   // stable sort keeps chapter order

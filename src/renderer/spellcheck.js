@@ -259,22 +259,29 @@ export function ignoreLint(lint) { ignored.add(`${lint.problem}|${lint.message}`
  * { spell, grammar, style }, leaving out ignored ones and dictionary words.
  */
 export async function proofCounts(texts, dialect = 'american') {
-  const l = await getLinter(dialect);
   const out = { spell: 0, grammar: 0, style: 0 };
-  for (const t of texts) {
-    if (!t || !t.trim()) continue;
-    const chars = [...t];
-    for (const lint of await l.lint(t, { language: 'plaintext' })) {
-      const sp = lint.span();
-      const problem = chars.slice(sp.start, sp.end).join('');
-      sp.free?.();
-      const message = lint.message().replace(/`([^`]+)`/g, '“$1”');
-      const cls = KIND_CLASS(lint.lint_kind());
-      if (ignored.has(`${problem}|${message}`)) continue;
-      if (cls === 'spell' && words.some((w) => w.toLowerCase() === problem.toLowerCase())) continue;
-      if (/^\s+$/.test(problem)) continue; // spacing follows the writer's choice
-      out[cls]++;
-    }
+  for (const t of texts) for (const p of await proofList(t, dialect)) out[p.cls]++;
+  return out;
+}
+/**
+ * The possible problems in one plain text (the book audit): [{ cls, problem, message }],
+ * leaving out ignored ones and dictionary words, like the underlines in the editor.
+ */
+export async function proofList(t, dialect = 'american') {
+  if (!t || !t.trim()) return [];
+  const l = await getLinter(dialect);
+  const out = [];
+  const chars = [...t];
+  for (const lint of await l.lint(t, { language: 'plaintext' })) {
+    const sp = lint.span();
+    const problem = chars.slice(sp.start, sp.end).join('');
+    sp.free?.();
+    const message = lint.message().replace(/`([^`]+)`/g, '“$1”');
+    const cls = KIND_CLASS(lint.lint_kind());
+    if (ignored.has(`${problem}|${message}`)) continue;
+    if (cls === 'spell' && words.some((w) => w.toLowerCase() === problem.toLowerCase())) continue;
+    if (/^\s+$/.test(problem)) continue; // spacing follows the writer's choice
+    out.push({ cls, problem, message });
   }
   return out;
 }

@@ -82,7 +82,7 @@ await shot('01-library');
 await click(`document.querySelector('.lib-new')`);
 await sleep(500);
 await evaluate(`(() => { const i = document.querySelector('.nb-form input'); i.value = 'Moonlight Ferry'; i.dispatchEvent(new Event('input')); })()`);
-// The logline is required: one or two sentences.
+// The description is optional.
 await evaluate(`(() => { const t = document.querySelector('.nb-form textarea.ll-main'); t.value = 'A ferry captain who has never left the harbor must cross the strait by moonlight to bring her brother home before the storm closes the sea.'; t.dispatchEvent(new Event('input')); })()`);
 await sleep(300);
 await shot('01b-new-book');
@@ -727,11 +727,11 @@ await evaluate(`(() => { const ed = document.querySelector('.ProseMirror'); ed.f
 for (let i = 0; i < 8; i++) { await send('Input.insertText', { text: ' more' }); await sleep(70); }
 results.liveCount.during = await evaluate(`document.querySelector('.tb-count').textContent`);
 results.liveCount.updated = results.liveCount.during !== results.liveCount.before;
-// Logline
+// Description (Book settings › General)
 await click(`document.querySelector('.sb-cover-btn')`); await sleep(400);
-await evaluate(`(() => { const t = document.querySelector('.ll-main'); t.value = 'When every lamp goes dark, a lamplighter’s daughter must cross the mountains for clear oil.'; t.dispatchEvent(new Event('input')); })()`);
+await evaluate(`(() => { const t = document.querySelector('.sheet textarea'); t.value = 'When every lamp goes dark, a lamplighter’s daughter must cross the mountains for clear oil.'; t.dispatchEvent(new Event('input')); })()`);
 await evaluate(`document.querySelector('.sheet-head .btn.primary').click()`); await sleep(300);
-results.notebook = { logline: await evaluate(`!!window.__lutefiskBook || true`) };
+results.notebook = { description: await evaluate(`!!window.__lutefiskBook || true`) };
 // Snippets: create, then insert from the editor's right-click menu
 await evaluate(`document.querySelector('.tool-research').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`); await sleep(200);
 await pop('Snippets'); await sleep(300);
@@ -825,7 +825,7 @@ await sleep(200);
 await evaluate(`(() => { const p = document.querySelector('.ProseMirror p'); const b = p.getBoundingClientRect(); p.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 60, clientY: b.top + 10 })); })()`);
 await sleep(300);
 await shot('94-right-click-menu');
-await pop('New Comment');
+await pop('Add Comment');
 await sleep(400);
 await evaluate(`(() => { const t = document.querySelector('.cm-card textarea'); t.value = 'Is this too slow an opening?'; t.dispatchEvent(new Event('input')); })()`);
 await click(`document.querySelector('.cm-card .cm-icon-btn.primary')`);
@@ -1153,7 +1153,7 @@ await evaluate(`document.querySelectorAll('.popover').forEach(p => p.remove())`)
 const nChars = await evaluate(`(window.__lutefiskBook?.characters || []).length`);
 await evaluate(`(() => { const ed = document.querySelector('.ProseMirror'); const p = ed.querySelector('p'); const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT); const t = w.nextNode(); const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, Math.min(5, t.length)); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); })()`); await sleep(200);
 await evaluate(`(() => { const b = getSelection().getRangeAt(0).getBoundingClientRect(); document.querySelector('.editor-mount .ProseMirror').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 2, clientY: b.top + 4 })); })()`); await sleep(300);
-await pop('Add as Character'); await sleep(500);
+await pop('Add Character'); await sleep(500);
 results.v3.addChar = await evaluate(`[!!document.querySelector('.sheet .ch-row.active'), (window.__lutefiskBook?.characters || []).length]`);
 results.v3.addCharOpen = await evaluate(`[...document.querySelectorAll('.sheet h2, .sheet .sheet-title')].map(x => x.textContent).join('|')`);
 await evaluate(`document.querySelector('.sheet-head .btn.primary')?.click()`); await sleep(300);
@@ -1161,7 +1161,7 @@ void nChars;
 // A comment on a code block belongs to the whole block
 await evaluate(`(() => { const c = [...document.querySelectorAll('.pm-code code')].pop(); c.scrollIntoView({ block: 'center' }); const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT); const t = w.nextNode(); const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, Math.min(3, t.length)); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`); await sleep(300);
 await evaluate(`(() => { const c = [...document.querySelectorAll('.pm-code code')].pop(); const b = c.getBoundingClientRect(); c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 6, clientY: b.top + 6 })); })()`); await sleep(300);
-await pop('New Comment'); await sleep(400);
+await pop('Add Comment'); await sleep(400);
 await evaluate(`(() => { const t = document.querySelector('.cm-card textarea'); t.value = 'Check this code'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`); await sleep(400);
 results.v3.codeComment = await evaluate(`(() => { const w = [...document.querySelectorAll('.pm-code-wrap')].pop(); return [!!w.dataset.comment, [...document.querySelectorAll('.cm-card .cm-text')].some(x => x.textContent === 'Check this code')]; })()`);
 // Right-click: chapters and scenes before/after, spelling and grammar checks, snippet wording

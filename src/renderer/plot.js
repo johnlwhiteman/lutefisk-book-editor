@@ -416,7 +416,7 @@ export function openPlot(ctx, sheet) {
   }
 
   draw();
-  const helpBtn = ctx.help ? h('button', { class: 'btn small plain', title: 'A step-by-step walkthrough of this view', onclick: () => ctx.help(view === 'timeline' ? 'timeline' : 'plotwalk') }, icon('help', 14), 'How It Works') : null;
+  const helpBtn = ctx.help ? h('button', { class: 'btn small plain', title: 'Help: Your story', onclick: () => ctx.help('story') }, icon('help', 14), 'How It Works') : null;
   const close = sheet('Plot', body, { full: true, actions: helpBtn });
   ctx.close = close;
   return { draw, setView: (v) => { view = v; viewSeg.setValue(v); draw(); } };

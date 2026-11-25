@@ -279,7 +279,6 @@ const UI_STEPS = [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 // Text size presets (Settings › Vision & Comfort and View › Text Size): the whole window's zoom.
 const TEXT_SIZES = [[1, 'Default'], [1.25, 'Large'], [1.5, 'Larger'], [1.75, 'Largest'], [2, 'Extra Large']];
 const nearestStep = (z) => UI_STEPS.reduce((a, b) => (Math.abs(b - z) < Math.abs(a - z) ? b : a), 1);
-const CONTRASTS = [[-1, 'Softer'], [0, 'Standard'], [1, 'Stronger'], [2, 'Strongest']];
 const prefsFile = () => path.join(app.getPath('userData'), 'prefs.json');
 async function readPrefs() { try { return JSON.parse(await fs.readFile(prefsFile(), 'utf8')); } catch { return {}; } }
 async function writePrefs(p) { await fs.writeFile(prefsFile(), JSON.stringify(p, null, 2), { mode: 0o600 }).catch(() => {}); }
@@ -287,7 +286,7 @@ let closeTimer = null;
 
 /* App settings the user controls. Paths are only ever set through a folder chooser. */
 const SETTINGS_DEFAULTS = { autosave: true, autosaveSeconds: 5, rememberLastDir: true, theme: 'system', skin: 'classic', a11yFont: false, a11yContrast: false, a11yMotion: false, a11yFocus: false, a11ySpacing: 'normal', uiZoom: 1, spellDialect: 'american', uiLanguage: 'en-US', spellStyle: true, dictionary: [], goalsOn: true, goalAuthors: null, customGenres: [], toolbarPos: 'top', paneOrder: ['binder', 'editor', 'preview'], editorFont: '', editorFontSync: false, sentenceSpacing: 'one' };
-const SKINS = ['classic', 'batik', 'seigaiha', 'washi', 'talavera', 'mudcloth', 'kuba', 'koru', 'meander', 'selbu', 'andean', 'contrast'];
+const SKINS = ['classic', 'paper', 'porcelain', 'linen', 'batik', 'seigaiha', 'washi', 'talavera', 'mudcloth', 'kuba', 'koru', 'meander', 'selbu', 'andean', 'contrast'];
 function cleanSettings(p) {
   const secs = Number(p.autosaveSeconds);
   return {
@@ -302,6 +301,9 @@ function cleanSettings(p) {
     // Vision and comfort.
     a11yFont: p.a11yFont === true,
     a11yContrast: p.a11yContrast === true,
+    // High contrast: one switch (title bar, Settings, View menu) that puts the High Contrast skin and the
+    // strongest contrast over whatever skin and contrast you chose; off brings yours back.
+    highContrast: p.highContrast === true,
     a11yMotion: p.a11yMotion === true,
     a11yFocus: p.a11yFocus === true,
     a11ySpacing: ['normal', 'relaxed', 'loose'].includes(p.a11ySpacing) ? p.a11ySpacing : 'normal',
@@ -349,12 +351,12 @@ async function uiZoom(dir) {
 function send(cmd) { return () => win?.webContents.send('menu', cmd); }
 
 // View › Appearance and View › Skin show the current choice (kept here so the menu can be rebuilt).
-const SKIN_NAMES = { classic: 'Classic', batik: 'Batik', seigaiha: 'Seigaiha', washi: 'Washi', talavera: 'Talavera', mudcloth: 'Bògòlan', kuba: 'Kuba', koru: 'Kōwhaiwhai', meander: 'Greek Key', selbu: 'Selbu', andean: 'Andean', contrast: 'High Contrast' };
-const menuLook = { skin: 'classic', theme: 'system', uiZoom: 1, contrast: 0 };
+const SKIN_NAMES = { classic: 'Classic', paper: 'Paper', porcelain: 'Porcelain', linen: 'Linen', batik: 'Batik', seigaiha: 'Seigaiha', washi: 'Washi', talavera: 'Talavera', mudcloth: 'Bògòlan', kuba: 'Kuba', koru: 'Kōwhaiwhai', meander: 'Greek Key', selbu: 'Selbu', andean: 'Andean', contrast: 'High Contrast' };
+const menuLook = { skin: 'classic', theme: 'system', uiZoom: 1, contrast: 0, highContrast: false };
 const lookMenus = () => [
   { label: t('Appearance'), submenu: [['system', 'System'], ['light', 'Day'], ['dark', 'Night']].map(([id, name]) => ({ label: t(name), type: 'radio', checked: menuLook.theme === id, click: send(`theme:${id}`) })) },
-  { label: t('Skin'), submenu: SKINS.map((id) => ({ label: t(SKIN_NAMES[id] || id), type: 'radio', checked: menuLook.skin === id, click: send(`skin:${id}`) })) },
-  { label: t('Contrast'), submenu: CONTRASTS.map(([v, name]) => ({ label: t(name), type: 'radio', checked: menuLook.contrast === v, click: send(`contrast:${v}`) })) },
+  { label: t('Skins'), submenu: SKINS.map((id) => ({ label: t(SKIN_NAMES[id] || id), type: 'radio', checked: menuLook.skin === id, click: send(`skin:${id}`) })) },
+  // Contrast and High contrast live in Settings › Vision & Comfort only.
 ];
 // View › Text Size: the presets, then a step larger or smaller (with the shortcuts).
 const textSizeMenu = () => ({ label: t('Text Size'), submenu: [
@@ -421,6 +423,7 @@ function buildMenu() {
         { label: t('Search Book'), accelerator: 'CmdOrCtrl+F', click: send('content-search') },
         { label: t('Find and Replace'), accelerator: 'CmdOrCtrl+Shift+H', click: send('find-replace') },
         { label: t('Check Spelling and Grammar (F7)'), click: send('spell-check') },
+        { label: t('Audit Book…'), click: send('audit-book') },
         { label: t('Show / Hide Comments'), accelerator: 'CmdOrCtrl+Alt+C', click: send('toggle-comments') },
         { label: t('Toggle Sidebar'), accelerator: MAC ? 'Cmd+Ctrl+S' : 'Ctrl+Shift+B', click: send('toggle-sidebar') },
         { type: 'separator' }, { role: 'togglefullscreen' },
@@ -445,7 +448,7 @@ function registerIpc() {
   handle('settings:set', async (patch = {}) => {
     const prefs = await readPrefs();
     // Paths can't be set from the window, only through the choosers below.
-    for (const k of ['autosave', 'autosaveSeconds', 'rememberLastDir', 'theme', 'skin', 'a11yFont', 'a11yContrast', 'contrast', 'a11yMotion', 'a11yFocus', 'a11ySpacing', 'uiZoom', 'spellLive', 'grammarLive', 'lintRules', 'spellDialect', 'uiLanguage', 'spellStyle', 'dictionary', 'goalsOn', 'goalAuthors', 'customGenres', 'toolbarPos', 'paneOrder', 'editorFont', 'editorFontSync', 'sentenceSpacing']) if (k in patch) prefs[k] = patch[k];
+    for (const k of ['autosave', 'autosaveSeconds', 'rememberLastDir', 'theme', 'skin', 'a11yFont', 'a11yContrast', 'contrast', 'highContrast', 'a11yMotion', 'a11yFocus', 'a11ySpacing', 'uiZoom', 'spellLive', 'grammarLive', 'lintRules', 'spellDialect', 'uiLanguage', 'spellStyle', 'dictionary', 'goalsOn', 'goalAuthors', 'customGenres', 'toolbarPos', 'paneOrder', 'editorFont', 'editorFontSync', 'sentenceSpacing']) if (k in patch) prefs[k] = patch[k];
     if (patch.resetLibraryDir) { delete prefs.libraryDir; customLibrary = ''; }
     if (patch.rememberLastDir === false) delete prefs.lastDir;
     Object.assign(prefs, cleanSettings({ ...SETTINGS_DEFAULTS, ...prefs }));
@@ -454,8 +457,8 @@ function registerIpc() {
     if ('theme' in patch) applyTheme(clean.theme);
     if ('uiZoom' in patch && win) win.webContents.setZoomFactor(clean.uiZoom);
     if ('uiLanguage' in patch) setLanguage(clean.uiLanguage);
-    const look = ['skin', 'theme', 'uiZoom', 'contrast'].some((k) => k in patch);
-    if (look) Object.assign(menuLook, { skin: clean.skin, theme: clean.theme, uiZoom: clean.uiZoom, contrast: clean.contrast });
+    const look = ['skin', 'theme', 'uiZoom', 'contrast', 'highContrast'].some((k) => k in patch);
+    if (look) Object.assign(menuLook, { skin: clean.skin, theme: clean.theme, uiZoom: clean.uiZoom, contrast: clean.contrast, highContrast: clean.highContrast });
     if ('uiLanguage' in patch || look) buildMenu();
     return clean;
   });
@@ -1144,7 +1147,7 @@ if (!app.requestSingleInstanceLock()) {
     buildMenu();
     readPrefs().then((p) => {
       const c = cleanSettings({ ...SETTINGS_DEFAULTS, ...p });
-      Object.assign(menuLook, { skin: c.skin, theme: c.theme, uiZoom: c.uiZoom, contrast: c.contrast });
+      Object.assign(menuLook, { skin: c.skin, theme: c.theme, uiZoom: c.uiZoom, contrast: c.contrast, highContrast: c.highContrast });
       if (c.uiLanguage && c.uiLanguage !== 'en-US') setLanguage(c.uiLanguage);
       buildMenu();
     }).catch(() => {});

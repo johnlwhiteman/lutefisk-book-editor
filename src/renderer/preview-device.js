@@ -18,7 +18,7 @@ const THEMES = {
 const EINK = { bg: '#efeee9', fg: '#1d1d1d', ui: '#555' };
 
 /**
- * The template strip under the device: ◀ [Template ▾] ▶ ⚙.
+ * The template control above the device: [🎨 Template ↕] ⚙.
  * ↑ ↓ ← → step through every design and the device redraws at each step.
  * The list (click the name) works the same way: arrow keys move and apply live,
  * Enter keeps the design, Esc goes back to the one you had; type to filter.
@@ -44,7 +44,7 @@ export function templateStrip(app) {
       const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
       if (d) { e.preventDefault(); e.stopPropagation(); step(d); }
       else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openList(); }
-    } }, icon('palette', 14), name, icon('chevron', 11));
+    } }, icon('palette', 15), name, icon('chevronUpDown', 12));
 
   function openList() {
     document.querySelector('.ts-list')?.remove();
@@ -120,10 +120,9 @@ export function templateStrip(app) {
   }
 
   queueMicrotask(draw);
+  // Like the device picker: one button with ↕ in it (↑ ↓ on it step through the designs), and the gear.
   const el = h('div', { class: 'ts-strip', role: 'group', 'aria-label': 'Template' },
-    h('button', { type: 'button', class: 'ts-arrow', title: 'Previous template — the device updates as you go', 'aria-label': 'Previous template', onclick: () => step(-1) }, icon('arrowLeft', 14)),
     btn,
-    h('button', { type: 'button', class: 'ts-arrow', title: 'Next template — the device updates as you go', 'aria-label': 'Next template', onclick: () => step(1) }, icon('arrowRight', 14)),
     h('button', { type: 'button', class: 'ts-arrow ts-cfg', title: 'Edit the current template — change its fonts, headings, ornament and spacing, then save', 'aria-label': 'Edit the current template', onclick: () => app.editTemplate?.() }, icon('gear', 15)));
   el.draw = draw;
   return el;

@@ -15,6 +15,10 @@ const listeners = new Set();
 /** Skins: the look of the app (never the book). Each has a day and a night version. */
 export const SKINS = [
   { id: 'classic', name: 'Classic', about: 'Clean and simple', day: ['#f5f5f7', '#007aff'], night: ['#1c1c1e', '#0a84ff'] },
+  // Three plain, whitish skins: no artwork, just quiet color.
+  { id: 'paper', name: 'Paper', about: 'Warm white, like a fresh page', day: ['#fbf9f5', '#8a6a44'], night: ['#1d1b18', '#d8b88c'] },
+  { id: 'porcelain', name: 'Porcelain', about: 'Cool, bright white with a slate-blue touch', day: ['#fafbfc', '#3c5a80'], night: ['#16181b', '#9db6d8'] },
+  { id: 'linen', name: 'Linen', about: 'Soft gray-white with a hint of sage', day: ['#f7f7f4', '#5d7a5a'], night: ['#1a1b19', '#a9c4a3'] },
   { id: 'batik', name: 'Batik', about: 'Java — indigo and soga brown, the kawung pattern', tex: 'batik', day: ['#efe6d6', '#7a4316'], night: ['#1a1510', '#e2a65c'] },
   { id: 'seigaiha', name: 'Seigaiha', about: 'Japan — indigo ocean waves', tex: 'seigaiha', day: ['#e9eef5', '#1f4e8c'], night: ['#111b2c', '#7fb2ff'] },
   { id: 'washi', name: 'Washi', about: 'Japan — fibered paper, sumi ink and a vermilion seal', tex: 'washi', day: ['#f1ece2', '#c0392b'], night: ['#1a1917', '#ff6b55'] },
@@ -27,8 +31,12 @@ export const SKINS = [
   { id: 'andean', name: 'Andean', about: 'Peru and Bolivia — woven steps in red, ochre and indigo', tex: 'andean', day: ['#efe5d8', '#a33a1f'], night: ['#1b130e', '#f08a4b'] },
   { id: 'contrast', name: 'High Contrast', about: 'Strong contrast for the easiest reading', day: ['#ffffff', '#0040c1'], night: ['#000000', '#6cb4ff'] },
 ];
-export const applySkin = (id) => { installSkinArt(); document.documentElement.dataset.skin = SKINS.some((s) => s.id === id) ? id : 'classic'; };
-export const setSkin = (skin) => { applySkin(skin); return update({ skin }); };
+// High contrast lays the High Contrast skin over the one you chose (which comes back when it's off).
+export const applySkin = (id) => { installSkinArt(); document.documentElement.dataset.skin = settings.highContrast ? 'contrast' : SKINS.some((s) => s.id === id) ? id : 'classic'; };
+// Choosing a skin shows it: high contrast goes off.
+export const setSkin = (skin) => { settings.highContrast = false; applySkin(skin); return update({ skin, highContrast: false }); };
+/** High contrast, on or off (Settings › Vision & Comfort). */
+export const setHighContrast = (on) => { settings.highContrast = !!on; applySkin(settings.skin); applyA11y(); return update({ highContrast: !!on }); };
 
 /** Vision and comfort settings, applied to the whole window. */
 export function applyA11y(st = settings) {
@@ -36,7 +44,9 @@ export function applyA11y(st = settings) {
   d.a11yFont = st.a11yFont ? 'on' : '';
   // Contrast: -1 softer, 0 standard, 1 stronger, 2 strongest (older settings: the a11yContrast box).
   const c = Number.isInteger(st.contrast) ? st.contrast : st.a11yContrast ? 1 : 0;
-  d.contrast = { '-1': 'soft', 1: 'strong', 2: 'max' }[c] || '';
+  d.contrast = st.highContrast ? 'max' : { '-1': 'soft', 1: 'strong', 2: 'max' }[c] || '';
+  d.highContrast = st.highContrast ? 'on' : '';
+  applySkin(st.skin);
   d.a11yMotion = st.a11yMotion ? 'reduce' : '';
   d.a11yFocus = st.a11yFocus ? 'on' : '';
   d.a11ySpacing = st.a11ySpacing && st.a11ySpacing !== 'normal' ? st.a11ySpacing : '';
@@ -100,7 +110,7 @@ export function autosaver(fn) {
 
 function skinPicker(redraw) {
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  return h('div', { class: 'skin-grid', role: 'radiogroup', 'aria-label': 'Skin' }, SKINS.map((s) => {
+  return h('div', { class: 'skin-grid', role: 'radiogroup', 'aria-label': 'Skins' }, SKINS.map((s) => {
     const [bg, accent] = dark ? s.night : s.day;
     const on = (settings.skin || 'classic') === s.id;
     return h('button', { type: 'button', class: `skin-card${on ? ' on' : ''}`, role: 'radio', 'aria-checked': String(on), title: `${s.name} — ${s.about}`, onclick: () => setSkin(s.id).then(() => redraw?.()) },
@@ -112,11 +122,28 @@ function skinPicker(redraw) {
 /** Day or night, chosen here or with the sun/moon button; “System” follows the computer. */
 export const setTheme = (theme) => update({ theme });
 const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+// The title-bar button steps through them in turn: Day → Night → System → Day.
+const THEME_CYCLE = { light: 'dark', dark: 'system', system: 'light' };
+const THEME_INFO = {
+  light: { icon: 'sun', name: 'Day' },
+  dark: { icon: 'moon', name: 'Night' },
+  system: { icon: 'system', name: 'System' },
+};
 export function themeButton() {
-  const b = h('button', { class: 'tb-icon tb-theme', 'aria-label': 'Day or night mode' });
-  const draw = () => { b.replaceChildren(icon(isDark() ? 'moon' : 'sun', 18)); b.title = isDark() ? 'Night mode — click for day' : 'Day mode — click for night'; };
-  b.addEventListener('click', () => setTheme(isDark() ? 'light' : 'dark'));
+  const b = h('button', { class: 'tb-icon tb-theme', 'aria-label': 'Appearance' });
+  const cur = () => (THEME_INFO[settings.theme] ? settings.theme : 'system');
+  const draw = () => {
+    const t = cur(), next = THEME_CYCLE[t];
+    b.replaceChildren(icon(THEME_INFO[t].icon, 18));
+    const now = t === 'system' ? `System (${isDark() ? 'night' : 'day'} right now, like your computer)` : THEME_INFO[t].name;
+    b.title = `Appearance: ${now} — click for ${THEME_INFO[next].name}`;
+    b.setAttribute('aria-label', `Appearance: ${THEME_INFO[t].name}. Click for ${THEME_INFO[next].name}.`);
+  };
+  b.addEventListener('click', () => setTheme(THEME_CYCLE[cur()]));
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  // Also when the appearance changes in Settings or the View menu; stops once the button is gone.
+  const off = onSettings(() => { if (b.dataset.shown && !b.isConnected) { off(); return; } draw(); });
+  requestAnimationFrame(() => { b.dataset.shown = '1'; });
   draw();
   return b;
 }
@@ -197,6 +224,12 @@ function a11ySection(draw) {
     h('div', { class: 'st-ic' }, icon('eye', 18)),
     h('div', { class: 'st-main' },
       h('h3', {}, 'Vision & Comfort'),
+      (() => {
+        const box = h('input', { type: 'checkbox', role: 'switch', class: 'switch', checked: !!settings.highContrast });
+        box.addEventListener('change', () => setHighContrast(box.checked).then(draw));
+        return h('label', { class: 'st-check a11y-check hc-switch' }, box, h('span', {}, h('b', {}, 'High contrast'),
+          h('small', { class: 'hint' }, 'Black and white with a strong accent, bold lines and no patterns — over any skin. Turn it off and your skin and contrast come back.')));
+      })(),
       h('div', { class: 'st-row st-row-wide' }, h('span', {}, 'Text size'),
         h('div', { class: 'size-steps', role: 'radiogroup', 'aria-label': 'Text size' }, sizes.map(([v, label, pct], i) => {
           const on = Math.abs(zoom - v) < 0.001;
@@ -204,7 +237,7 @@ function a11ySection(draw) {
             h('span', { class: 'size-a', style: { fontSize: `${12 + i * 3}px` } }, 'A'), h('span', { class: 'size-name' }, label), h('small', {}, pct));
         })),
         h('small', { class: 'hint' }, `Makes all the words and controls in the window larger. Also in View › Text Size, or ${B.platform === 'darwin' ? '⇧⌘+ and ⇧⌘−' : 'Ctrl+Shift+Plus and Ctrl+Shift+Minus'}. The editor and the previews have their own text size as well.${[1, 1.25, 1.5, 1.75, 2].some((v) => Math.abs(zoom - v) < 0.001) ? '' : ` Now: ${Math.round(zoom * 100)}%.`}`)),
-      h('div', { class: 'st-row st-row-wide' }, h('span', {}, 'Contrast'),
+      h('div', { class: `st-row st-row-wide${settings.highContrast ? ' st-dim' : ''}` }, h('span', {}, 'Contrast'),
         segmented([{ value: '-1', label: 'Softer' }, { value: '0', label: 'Standard' }, { value: '1', label: 'Stronger' }, { value: '2', label: 'Strongest' }], String(contrast), (v) => update({ contrast: Number(v) }).then(draw), { label: 'Contrast' }),
         h('small', { class: 'hint' }, 'Works with every skin. Softer: gentler gray text, for glare. Stronger: darker secondary text, clearer lines and a fainter pattern. Strongest: all text at full strength, bold lines, no pattern and underlined links. The High Contrast skin goes further still.')),
       h('label', { class: 'st-row' }, h('span', {}, 'Formatting toolbar'),
@@ -258,10 +291,10 @@ export function openSettings(sheet) {
         h('div', { class: 'st-main' },
           h('h3', {}, 'Appearance'),
           segmented([{ value: 'system', label: 'System' }, { value: 'light', label: 'Day', icon: 'sun' }, { value: 'dark', label: 'Night', icon: 'moon' }], settings.theme || 'system', (v) => setTheme(v).then(() => setTimeout(draw, 50)), { label: 'Appearance' }),
-          h('p', { class: 'hint' }, 'System follows your computer’s light or dark setting. The sun/moon button in the title bar switches quickly. Book previews keep their own page colors.'),
-          h('h3', { class: 'st-sub' }, 'Skin'),
+          h('p', { class: 'hint' }, 'System follows your computer’s light or dark setting. The button in the title bar steps through Day, Night and System. Book previews keep their own page colors.'),
+          h('h3', { class: 'st-sub' }, 'Skins'),
           skinPicker(draw),
-          h('p', { class: 'hint' }, 'Colors and textures for Lutefisk Book Editor itself, in day and night. Your book’s design is set by its template.'))),
+          h('p', { class: 'hint' }, 'Colors and artwork for Lutefisk Book Editor itself, in day and night. Your book’s design is set by its template. High contrast leaves the artwork off, for the clearest reading.'))),
       languageSection(draw),
       goalsSection(draw),
       spellSection(draw),

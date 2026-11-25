@@ -4,21 +4,23 @@ import { h, icon, dialog, toast, confirmDialog, debounce, assetUrl, popover, clo
 import { createEditor, createMiniEditor, setQuoteMode } from './editor.js';
 import { createDevicePreview } from './preview-device.js';
 import { createPrintPreview } from './preview-print.js';
-import { openBookSettings, openTemplates, generatedPanel, sheet, allTemplates, applyTemplate, genreSelect, loglineField, loglineSentences } from './panels.js';
+import { openBookSettings, openTemplates, generatedPanel, sheet, allTemplates, applyTemplate, genreSelect } from './panels.js';
 import { openTemplateEditor } from './template-editor.js';
 import { titleCheckButton, recaseAll } from './title-check.js';
 import { bookTitleStyle } from '../shared/titlecase.js';
 import { openHelp, startTour, resumeTour } from './help.js';
 import { toBin, binCount, openRecycleBin } from './bin.js';
+import { openThoughts, quickThought, thoughtsOf } from './thoughts.js';
 import { blockStyles } from '../shared/blockstyle.js';
 import { createGoals, goalMeter, openGoals, stopwatchControl, sessionPopover, ensureGoalDefaults, progressMeters } from './goals.js';
 import { openInsights } from './history.js';
-import { openCharacters, suggestNames } from './characters.js';
+import { openCharacters, suggestNames, avatar as characterAvatar } from './characters.js';
 import { openPlot } from './plot.js';
 import { createSearch } from './search.js';
 import { replaceInMarkdown, typoMarkdown } from './editor.js';
 import { loadSettings, settings, setSkin, setTheme, autosaver, openSettings, backupProject, backupDialog, themeButton, onSettings, addDictionaryWord, updateSettings, setToolbarPos, paneOrder, setPaneOrder, PANE_ORDERS, paneOrderLabel, EDITOR_FONTS } from './settings.js';
-import { setDictionary, setRules, warmUp, setIgnored, ignoredList, unignore, proofCounts, setSentenceSpacing } from './spellcheck.js';
+import { setDictionary, setRules, warmUp, setIgnored, ignoredList, unignore, proofCounts, proofList, setSentenceSpacing } from './spellcheck.js';
+import { openAudit, auditTally } from './audit.js';
 import { countMentions, newCharacter } from '../shared/characters.js';
 import { createCommentRail } from './comments.js';
 import { GROUPS, SECTION_TYPES, DEFAULT_CONTENT, defaultBook, ensureSections, newId, numberSections, aboutAuthorsLabel, syncAuthors } from '../shared/sections.js';
@@ -151,15 +153,17 @@ async function showLibrary() {
   }
   const view = h('div', { class: 'library' },
     h('div', { class: 'lib-titlebar drag' }),
-    h('div', { class: 'lib-brand' }, brandMark(52, 'lib-brand-mark'), h('div', {}, h('div', { class: 'brand-word' }, 'Lutefisk Book Editor'), h('div', { class: 'brand-tag' }, 'Write, design and publish books, privately.')),
-),
+    // Settings sits just right of the name, as it sits right of the fish in a book's title bar.
+    h('div', { class: 'lib-brand' }, brandMark(52, 'lib-brand-mark'),
+      h('div', {}, h('div', { class: 'brand-word-row' }, h('div', { class: 'brand-word' }, 'Lutefisk Book Editor'),
+        h('button', { class: 'lib-gear lib-brand-gear', title: 'Settings — appearance, spelling, saving and more', 'aria-label': 'Settings', onclick: () => openSettings(sheet) }, icon('gear', 20))),
+      h('div', { class: 'brand-tag' }, 'Write, design and publish books, privately.'))),
     h('header', { class: 'lib-head' },
       h('div', {}, h('h1', {}, 'Library'), h('p', {}, data.books.length ? `${data.books.length} ${data.books.length === 1 ? 'book' : 'books'}` : 'Your books will appear here.')),
       h('div', { class: 'lib-actions' },
         h('button', { class: 'btn', title: 'Open a book folder', onclick: openBook }, icon('folder', 16), 'Open…'),
         h('button', { class: 'btn primary', onclick: () => newBookSheet(data) }, icon('plus', 16), 'New Book'),
         h('div', { class: 'lib-tools' },
-          h('button', { class: 'lib-gear', title: 'Settings', 'aria-label': 'Settings', onclick: () => openSettings(sheet) }, icon('gear', 20)),
           themeButton(),
           h('button', { class: 'lib-gear', title: 'Help — how to make your first book, and a guided tour (F1)', 'aria-label': 'Help', onclick: () => openHelp(app) }, icon('help', 20))))),
     h('main', { class: 'lib-scroll' }, grid,
@@ -172,7 +176,11 @@ async function showLibrary() {
     h('div', { class: 'drop-hint' }, h('div', {}, icon('folder', 40), h('b', {}, 'Drop to open book'))));
   root.replaceChildren(view);
   app.book = null;
+  libGoalsShown = settings.goalsOn !== false;
 }
+// Turning goals off (or on) in Settings while the Library is open redraws it, so each book's goal line goes (or comes back).
+let libGoalsShown = null;
+onSettings(() => { if (mode === 'library' && !app.book && libGoalsShown !== null && libGoalsShown !== (settings.goalsOn !== false)) showLibrary(); });
 
 async function deleteProject(b) {
   const kind = 'book';
@@ -227,9 +235,9 @@ async function newBookSheet(lib) {
   const genreSel = genreSelect(() => genre, (g) => { genre = g; });
   // Its own cover color, unlike the books already in the library.
   const tone = newCoverTone(lib.books || []);
-  // The logline: required — the story in one or two sentences.
-  const ll = { logline: '' };
-  const loglineBox = loglineField(ll, () => {}, { required: true, rows: 3 });
+  // The description: optional — what the book is about (stores show it; it's on the generated back cover).
+  const desc = h('textarea', { rows: 3, class: 'll-main', placeholder: 'What’s the book about? (Optional — you can add it later in Book settings.)', 'aria-label': 'Description' });
+  const descBox = h('label', { class: 'fld book-only' }, h('span', {}, 'Description'), desc);
   // Design: a list where ↑ ↓ and pointing show each design on the book; only a click or Return chooses it.
   let design = 'classic', shown = '';
   const GROUPS_ = ['General', 'Fiction', 'Literary', 'Nonfiction'].map((c) => ({ c, items: TEMPLATES.filter((t) => t.category === c).sort((a, b) => a.name.localeCompare(b.name)) })).filter((g) => g.items.length);
@@ -324,7 +332,7 @@ async function newBookSheet(lib) {
     h('label', { class: 'fld book-only' }, h('span', {}, 'Subtitle'), h('div', { class: 'title-row' }, subtitle, titleCheckButton(subtitle, tcOpts))),
     h('label', { class: 'fld author-fld' }, authorLbl, author),
     h('label', { class: 'fld book-only' }, h('span', {}, 'Genre'), genreSel),
-    loglineBox,
+    descBox,
     h('div', { class: 'fld book-only' }, h('span', {}, 'Design'), tplWrap),
     h('div', { class: 'fld' }, h('span', {}, 'Location'), h('div', { class: 'loc-row' }, icon('folder', 16), locLbl,
       h('button', { type: 'button', class: 'btn small', onclick: async () => { const p = await B.chooseLocation(); if (p) { parent = p; drawLoc(); } } }, 'Change…'))),
@@ -335,18 +343,11 @@ async function newBookSheet(lib) {
   const close = () => overlay.remove();
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const logline = ll.logline.trim();
-    if (!logline || loglineSentences(logline) > 2) {
-      const ta = loglineBox.textarea;
-      ta.setCustomValidity(!logline ? 'What’s the book about? Tell it in one or two sentences.' : 'Keep the logline to one or two sentences.');
-      ta.reportValidity(); ta.focus();
-      return;
-    }
     create.disabled = true;
     const book = ensureSections(defaultBook({ title: title.value.trim() || 'Untitled Book', subtitle: subtitle.value.trim(), author: author.value.trim() }));
     book.template = design;
     if (genre) book.genre = genre;
-    book.logline = logline;
+    if (desc.value.trim()) book.description = desc.value.trim();
     book.coverTone = tone;
     ensureGoalDefaults(book, Date.now());
     if (titleStyle !== 'apa') book.titleStyle = titleStyle;
@@ -420,16 +421,16 @@ function buildShell() {
 
   const titlebar = h('header', { class: 'titlebar drag' },
     h('div', { class: 'tb-left' },
-      h('button', { class: 'tb-icon tb-brand', title: 'Lutefisk Book Editor Library (⇧⌘L)', 'aria-label': 'Library', onclick: showLibrary }, brandMark(22))),
+      h('button', { class: 'tb-icon tb-brand', title: 'Lutefisk Book Editor Library (⇧⌘L)', 'aria-label': 'Library', onclick: showLibrary }, brandMark(22)),
+      // Settings, just right of the fish: the app's own preferences (the book's are under its cover in the binder).
+      h('button', { class: 'tb-icon tb-gear', title: 'Settings — appearance, spelling, saving and more', 'aria-label': 'Settings', onclick: () => openSettings(sheet) }, icon('gear', 18)),
+      // The Recycle Bin, right of Settings (it says how much is in it when you point at it).
+      els.binBtn = h('button', { class: 'tb-icon tb-bin', 'aria-label': 'Recycle Bin', onclick: () => { if (app.book) openBin(); } }, icon('trash', 18))),
     h('div', { class: 'tb-doc' }, els.docTitle, h('div', { class: 'tb-doc-sub' }, els.tbCount = h('span', { class: 'tb-count', 'aria-live': 'off' }), els.save,
       h('button', { class: 'tb-backup', title: 'Back Up Book — save a copy of the whole book folder, beside it or in another folder', onclick: () => app.backupBook() }, icon('download', 12), 'Back Up'))),
     h('div', { class: 'tb-right' }, exportBtn,
       h('div', { class: 'tb-tools' },
-        els.layoutBtn = h('button', { class: 'tb-icon', title: 'Panel order — put the binder, editor and preview in any order', 'aria-label': 'Panel order', onclick: () => popover(els.layoutBtn, [
-          { header: 'Panel order, left to right' },
-          ...PANE_ORDERS.map((o) => ({ label: paneOrderLabel(o), icon: o.join() === paneOrder().join() ? 'check' : null, onClick: () => setPaneOrder(o) })),
-        ], { align: 'right', width: 250 }) }, icon('columns', 18)),
-        h('button', { class: 'tb-icon', title: 'Settings', 'aria-label': 'Settings', onclick: () => openSettings(sheet) }, icon('gear', 18)),
+        els.layoutBtn = h('button', { class: 'tb-icon', title: 'Panels — arrange the binder, editor and preview', 'aria-label': 'Panels', onclick: () => popover(els.layoutBtn, [{ node: panelPicker() }], { align: 'right' }) }, icon('columns', 18)),
         themeButton(),
         h('button', { class: 'tb-icon tb-help', title: 'Help — a short guide and a guided tour (F1)', 'aria-label': 'Help', onclick: () => openHelp(app) }, icon('help', 18)))));
 
@@ -447,10 +448,13 @@ function buildShell() {
   // Story tools, top left of the editor: icons only; the hover tip names each one and says what it does.
   const toolBtn = (cls, ic, text, title, onclick) => h('button', { class: `ed-tool ${cls}`, title, 'aria-label': text, onclick }, icon(ic, 16));
   // Characters first (top left), with how many there are.
-  els.castBtn = toolBtn('tool-chars', 'people', 'Characters', 'Characters — your cast and where each one appears', () => openCast());
+  els.castBtn = toolBtn('tool-chars', 'people', 'Characters', 'Characters', () => openCast());
+  els.castBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); castMenu(els.castBtn); });
   els.storyTools = h('div', { class: 'ed-tools', role: 'group', 'aria-label': 'Story tools' },
     els.castBtn, els.commentsBtn, els.spellBtn, els.grammarBtn,
-    els.toolsBtn = toolBtn('tool-tools', 'wand', 'Tools', 'Tools — curly or straight quotes, and one or two spaces after punctuation', () => toolsMenu(els.toolsBtn)));
+    els.toolsBtn = toolBtn('tool-tools', 'wand', 'Tools', 'Tools', () => toolsMenu(els.toolsBtn)),
+    // Random Thoughts, right of Tools: all your thoughts, to add, edit or delete.
+    els.thoughtsBtn = toolBtn('tool-thoughts', 'thought', 'Random Thoughts', 'Random Thoughts', () => showThoughts()));
   els.headRow = h('span', { hidden: true }); // chapter heading style now lives in Book › Chapters and the templates
   els.chaptersBtn = h('button', { class: 'scene-btn chapters-menu', title: 'Chapters — go to any chapter or other part of the book', onclick: () => chapterJumpMenu(els.chaptersBtn) }, icon('toc', 15), h('span', {}, 'Chapters'), icon('chevron', 12));
   els.sceneBtn = h('button', { class: 'scene-btn scenes-menu', title: 'Scenes — split this chapter into scenes, add a scene, or go to one', onclick: () => sceneActions(els.sceneBtn) }, icon('scene', 15), els.sceneBtnLabel = h('span', {}, 'Scenes'), icon('chevron', 12));
@@ -623,7 +627,7 @@ function buildShell() {
       }
       safely(() => {
         if (tr.docChanged || tr.selectionSet) railSoon();
-        if (tr.docChanged) { app.goals.activity(); trackActivity(app.currentId); }
+        if (tr.docChanged) { app.goals.activity(); trackActivity(app.currentId); auditSoon(); }
         if (writingFocus) requestAnimationFrame(() => app.editor.centerCaret());
         if (currentResearch()) { if (tr.docChanged) flushSerializeSoon(); updateStatusSoon(); }
       }, 'typing');
@@ -631,9 +635,15 @@ function buildShell() {
     pickCitation: (attrs) => pickCitation(attrs),
     findSource: (url) => findSourceByUrl(url),
     makeCard: (md, text) => newCard({ text: md, title: text, from: noteWhere() }),
+    newThought: (text) => newThoughtAtMouse(text),
     citeLink: (link) => citeLink(link),
     formatCitation: (ref, loc) => citer(app.book || {}, app.contents)(ref, loc),
     addAsCharacter: (text) => addAsCharacter(text),
+    // Character names tinted in the text; point at one and click it to open that character.
+    characters: () => (charHighlights() && app.book ? app.book.characters || [] : []),
+    openCharacter: (id) => openCast(id, { keepPlace: true }),
+    characterAvatar: (c, size) => characterAvatar(c, size),
+    setCharacterHighlights: (on) => setCharHighlights(on),
     structureItems: () => structureItems(),
     toolbarPos: () => (settings.toolbarPos === 'bottom' ? 'bottom' : 'top'),
     setToolbarPos: (pos) => setToolbarPos(pos),
@@ -871,6 +881,18 @@ function syncBookFont({ quiet = false } = {}) {
   fullPrint = true; schedulePreview(false, true);
   if (!quiet) toast(id ? 'The book now uses the editor font in the e-book and print previews' : 'The book uses its template font again', 'info', 2200);
 }
+/**
+ * Panels: the six arrangements as little pictures — binder, editor and preview, left to right,
+ * each shown by its icon. Pointing at one names it; clicking it uses it.
+ */
+function panelPicker() {
+  const cur = paneOrder().join();
+  const PANE = { binder: { ic: 'binder', name: 'Binder', w: 2 }, editor: { ic: 'pen', name: 'Editor', w: 4 }, preview: { ic: 'device', name: 'Preview', w: 3 } };
+  return h('div', { class: 'pp', role: 'group', 'aria-label': 'Panels' },
+    ...PANE_ORDERS.map((o) => h('button', { type: 'button', class: `pp-tile${o.join() === cur ? ' on' : ''}`, title: paneOrderLabel(o), 'aria-label': paneOrderLabel(o), 'aria-pressed': String(o.join() === cur),
+      onclick: () => { closePopovers(); setPaneOrder(o); } },
+    ...o.map((p) => h('span', { class: `pp-pane pp-${p}`, style: { flex: PANE[p].w } }, icon(PANE[p].ic, 12))))));
+}
 /** Move a pane one place left (-1) or right (1). */
 function movePane(which, dir) {
   const order = [...paneOrder()];
@@ -888,8 +910,7 @@ function paneMenu(e, which) {
   popover(anchor, [
     { label: `Move ${name} Left`, icon: 'prev', disabled: i === 0, onClick: () => movePane(which, -1) },
     { label: `Move ${name} Right`, icon: 'next', disabled: i === 2, onClick: () => movePane(which, 1) },
-    '-', { header: 'Panel order' },
-    ...PANE_ORDERS.map((o) => ({ label: paneOrderLabel(o), icon: o.join() === order.join() ? 'check' : null, onClick: () => setPaneOrder(o) })),
+    '-', { node: panelPicker() },
   ], { width: 250 });
   setTimeout(() => anchor.remove(), 0);
 }
@@ -943,8 +964,9 @@ function storyUnits() {
     const md = hasScenes(s) ? joinScenes(s.scenes, app.contents, { all: true }) : app.contents[s.id];
     return {
       id: s.id,
-      title: s.type === 'chapter' ? s.tocTitle : s.displayTitle,
-      short: s.type === 'chapter' ? String(s.number) : (SECTION_TYPES[s.type].label[0] || ''),
+      // Never "null": a chapter without a number (left out of the book) shows a dash, and every unit has a title.
+      title: (s.type === 'chapter' ? s.tocTitle : s.displayTitle) || s.displayTitle || s.title || SECTION_TYPES[s.type].label || 'Untitled',
+      short: s.type === 'chapter' ? (s.number != null ? String(s.number) : '–') : (SECTION_TYPES[s.type].label[0] || ''),
       text: proseText(md),
       parts: hasScenes(s) ? s.scenes.map((sc, i) => { const t = proseText(app.contents[sc.id]); return { title: sceneLabel(sc, i), count: (c) => countMentions(t, c) }; }) : [],
     };
@@ -961,29 +983,58 @@ function storyCtx(extra = {}) {
   return ctx;
 }
 /**
- * Right-click › Add as Character: a selected name becomes a character (or opens
+ * Right-click › Add Character: a selected name becomes a character (or opens
  * the one already called that); a longer passage starts a new character with it in
  * the notes. Either way the character editor opens on that character.
  */
 function addAsCharacter(text) {
   const book = app.book;
   if (!book) return;
-  const t = text.replace(/\s+/g, ' ').trim().slice(0, 2000);
-  if (!t) return;
+  const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+  const list0 = book.characters || (book.characters = []);
+  // Nothing selected: a new, empty character, ready for a name (the place in the text stays put).
+  if (!t) {
+    const c = newCharacter(newId('ch'), '', list0.length);
+    list0.push(c); app.markDirty(); refreshSidebar();
+    openCast(c.id, { keepPlace: true });
+    requestAnimationFrame(() => document.querySelector('.ch-name')?.focus());
+    return;
+  }
   const isName = t.length <= 48 && t.split(' ').length <= 5 && !/[.!?;:]$/.test(t);
   const list = book.characters || (book.characters = []);
   const known = isName && list.find((c) => [c.name, ...(Array.isArray(c.aliases) ? c.aliases : [])].some((n) => String(n || '').toLowerCase() === t.toLowerCase()));
-  if (known) { openCast(known.id); return; }
+  if (known) { openCast(known.id, { keepPlace: true }); return; }
   const c = newCharacter(newId('ch'), isName ? t : 'New character', list.length);
   if (!isName) c.notes = `“${t}”`;
   list.push(c);
   app.markDirty();
   refreshSidebar();
-  openCast(c.id);
+  openCast(c.id, { keepPlace: true });
 }
-function openCast(select) {
+function openCast(select, { keepPlace = false } = {}) {
   if (!app.book) return;
-  openCharacters(storyCtx({ units: storyUnits, suggest: () => suggestNames(storyUnits().map((u) => u.text).join('\n')), importFromBook: importCast }), sheet, { select });
+  // Closing Characters comes back to the text just as it was (the cursor and scroll never moved);
+  // names you added or renamed are highlighted at once.
+  openCharacters(storyCtx({ units: storyUnits, suggest: () => suggestNames(storyUnits().map((u) => u.text).join('\n')), importFromBook: importCast,
+    // Mark names in the text: the switch at the top of the Characters window.
+    marks: { get: charHighlights, set: setCharHighlights },
+    onClose: () => { drawCastBtn(); if (keepPlace && !els.editorMount.hidden) app.editor?.focus(); } }), sheet, { select });
+}
+
+/* ---- character names highlighted in the text (on unless you turn it off) */
+const charHighlights = () => { try { return localStorage.getItem('lutefisk.charHighlights') !== 'off'; } catch { return true; } };
+function setCharHighlights(on) {
+  try { localStorage.setItem('lutefisk.charHighlights', on ? 'on' : 'off'); } catch { /* storage unavailable */ }
+  app.editor?.refreshCharacters?.();
+  toast(on ? 'Character names are marked — point at one to open it' : 'Character names are no longer marked', 'ok', 1800);
+}
+function castMenu(anchor) {
+  const on = charHighlights();
+  popover(anchor, [
+    { label: 'Open Characters', icon: 'people', onClick: () => openCast() },
+    '-',
+    { label: 'Mark Names in the Text', icon: on ? 'check' : null, hint: on ? 'On' : 'Off', onClick: () => setCharHighlights(!on) },
+  ], { width: 260 });
 }
 /**
  * Characters › Import from Another Book…: pick one of your books, tick the characters to bring
@@ -1050,8 +1101,11 @@ function drawCastBtn() {
   if (!b || !app.book) return;
   const n = (app.book.characters || []).length;
   b.querySelector('.ed-badge')?.remove();
-  if (n) b.append(h('span', { class: 'ed-badge cast-n', 'aria-hidden': 'true' }, String(n)));
-  b.title = `Characters — your cast and where each one appears${n ? ` (${n})` : ''}`;
+  // The editor's tool icons are named by their label alone.
+  b.title = 'Characters';
+  // The cast changed (added, renamed, removed, another book): find the names again in the text.
+  const sig = JSON.stringify((app.book.characters || []).map((c) => [c.id, c.name, c.aliases, c.color, c.matchFirst]));
+  if (sig !== drawCastBtn.sig) { drawCastBtn.sig = sig; app.editor?.refreshCharacters?.(); }
   b.setAttribute('aria-label', n ? `Characters, ${n}` : 'Characters');
 }
 
@@ -1142,9 +1196,7 @@ function drawProofBtns() {
     btn.hidden = !app.book;
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
-    btn.title = on
-      ? `${label} — checked as you type (${kind === 'spell' ? 'red' : 'blue'} highlights). Click to turn off.`
-      : `${label} — not checked as you type. Click to turn on.`;
+    btn.title = label;
     const ic = kind === 'spell' ? (on ? 'spellAbc' : 'spellAbcOff') : (on ? 'grammar' : 'grammarOff');
     btn.replaceChildren(icon(ic, 16));
   }
@@ -1165,13 +1217,10 @@ function checkSpellingNow(what = 'both') {
 function drawCommentsBtn() {
   if (!els.commentsBtn) return;
   const hiddenNow = commentsHidden_();
-  const n = commentCount.open;
   els.commentsBtn.hidden = !app.book || !!currentResearch?.();
   els.commentsBtn.classList.toggle('on', !hiddenNow);
   els.commentsBtn.setAttribute('aria-pressed', String(!hiddenNow));
-  els.commentsBtn.title = hiddenNow
-    ? `Comments — show the comment margin (⌥⌘C). ${n ? `${n} open.` : 'Add one with ⌃⌥M.'}`
-    : `Comments — hide the comment margin (⌥⌘C). ${n ? `${n} open.` : 'Add one with ⌃⌥M.'}`;
+  els.commentsBtn.title = 'Comments';
   els.commentsBtn.setAttribute('aria-label', hiddenNow ? 'Show comments' : 'Hide comments');
   els.commentsBtn.replaceChildren(icon(hiddenNow ? 'commenterOff' : 'commenter', 16));
   drawProofBtns();
@@ -1252,6 +1301,8 @@ function refreshSidebar() {
   const sb = els.sidebar;
   const book = app.book;
   if (!book) return;
+  // A name being edited in the binder isn't swept away; the binder catches up when it's done.
+  if (binderRename) { binderRename.pending = true; return; }
   applyBlockLook(book);
   drawCastBtn();
   const numbered = numberSections(book.sections, templateById(book.template), book);
@@ -1280,17 +1331,24 @@ function refreshSidebar() {
     h('div', { class: 'sb-cover' }, book.cover ? h('img', { src: assetUrl(book.cover), alt: '' }) : generatedCover(book.title, book.author, fontStack(templateById(book.template).head), book.subtitle, book.coverTone), h('div', { class: 'lib-spine' })));
   // Beside the cover: Goals and, under it, Insights. The book search sits just below.
   const sideBtn = (cls, ic, text, sub, onclick, title) => h('button', { class: `sb-side-btn ${cls}`, onclick, title, 'aria-label': title.split(' — ')[0] }, icon(ic, 15), h('span', { class: 'sb-label' }, text), sub ? h('span', { class: 'sb-count' }, sub) : null);
-  sb.append(h('div', { class: 'sb-book' }, coverBtn,
-    h('div', { class: 'sb-book-side' },
-      h('button', { class: 'sb-book-title', title: `${book.title || 'Untitled'} — Book settings`, onclick: () => openBookSettings(app, 'general') }, book.title || 'Untitled'),
-      settings.goalsOn !== false ? sideBtn('sb-goals', 'target', 'Goals', goalCounts(), () => openGoals(app, app.goals, sheet), 'Goals — book length, deadline countdown and daily goal') : null,
-      sideBtn('sb-insights', 'chart', 'Insights', '', () => app.openInsights(), 'Insights — your book: words, readability, style, spelling and grammar'),
-      // Research, under Insights: the book's research notes (README.md), index cards, files and story tools.
-      sideBtn('sb-research', 'research', 'Research', '', () => openResearchHub(), 'Research — your notes about the book (README.md), index cards, files, characters, plot and timeline. Never in the book.'))),
+  // The title across the top; under it the cover, and beside the cover two rows:
+  // Goals · Insights, then Research · Audit.
+  els.auditBtn = sideBtn('sb-audit', 'audit', 'Audit', '', () => app.openAudit(), 'Audit — check the book for anything missing or wrong before it goes out');
+  const gc = goalCounts();
+  sb.append(h('div', { class: 'sb-book sb-book-grid' },
+    h('button', { class: 'sb-book-title', title: `${book.title || 'Untitled'} — Book settings`, onclick: () => openBookSettings(app, 'general') }, book.title || 'Untitled'),
+    h('div', { class: 'sb-book-body' }, coverBtn,
+      h('div', { class: 'sb-book-links' },
+        settings.goalsOn !== false ? sideBtn('sb-goals', 'target', 'Goals', '', () => openGoals(app, app.goals, sheet), `Goals — book length, deadline countdown and daily goal${gc ? ` (${gc})` : ''}`) : null,
+        sideBtn('sb-insights', 'chart', 'Insights', '', () => app.openInsights(), 'Insights — your book: words, readability, style, spelling and grammar'),
+        sideBtn('sb-research', 'research', 'Research', '', () => openResearchHub(), 'Research — your notes about the book (README.md), index cards, random thoughts, files, characters, plot and timeline. Never in the book.'),
+        els.auditBtn))),
     h('div', { class: 'sb-searchrow' }, app.search.bar, filterBtn));
 
   const scroller = h('div', { class: 'sb-scroll' });
   const navRow = (ic, text, sub, onclick, extra) => h('li', { class: 'sb-row nav' }, h('button', { class: 'sb-name', onclick }, icon(ic, 15), h('span', { class: 'sb-label' }, text), sub ? h('span', { class: 'sb-count' }, sub) : null), extra || null);
+  // The outside of the book: the front cover before the front matter, the back cover after the back matter.
+  scroller.append(coverRow('cover'));
   for (const g of GROUPS) {
     const included = book.sections.filter((s) => SECTION_TYPES[s.type]?.group === g.id && (s.enabled !== false || SECTION_TYPES[s.type].multi));
     const available = book.sections.filter((s) => SECTION_TYPES[s.type]?.group === g.id && s.enabled === false && !SECTION_TYPES[s.type].multi);
@@ -1317,7 +1375,7 @@ function refreshSidebar() {
       const def = SECTION_TYPES[s.type];
       const sceneHit = filterActive() && hasScenes(s) && s.scenes.some(matchesFilter);
       const hit = filterActive() && (matchesFilter(s) || sceneHit);
-      const li = h('li', { class: `sb-row${s.id === app.currentId ? ' active' : ''}${s.exclude ? ' excluded' : ''}${filterActive() ? (hit ? ' hit' : ' dim') : ''}`, title: s.exclude ? 'Excluded from the book' : null, role: 'option', 'aria-selected': String(s.id === app.currentId), draggable: def.multi ? 'true' : null, tabindex: -1 });
+      const li = h('li', { class: `sb-row${s.id === app.currentId ? ' active' : ''}${s.exclude ? ' excluded' : ''}${filterActive() ? (hit ? ' hit' : ' dim') : ''}`, title: s.exclude ? 'Excluded from the book' : null, role: 'option', 'aria-selected': String(s.id === app.currentId), draggable: 'true', tabindex: -1 });
       const scenes = hasScenes(s);
       const open = scenes && (app.expanded.has(s.id) || findScene(app.currentId)?.chapter === s || (filterActive() && s.scenes.some(matchesFilter)));
       const disc = scenes ? h('span', { class: `sb-disc${open ? ' open' : ''}`, role: 'button', 'aria-label': open ? 'Collapse scenes' : 'Expand scenes', onclick: (e) => { e.stopPropagation(); if (open) app.expanded.delete(s.id); else app.expanded.add(s.id); refreshSidebar(); } }, icon('next', 12)) : null;
@@ -1327,40 +1385,138 @@ function refreshSidebar() {
       const lead = g.id === 'body'
         ? [disc || h('span', { class: 'sb-disc sb-disc-none', 'aria-hidden': 'true' }), num ? h('span', { class: 'sb-num', 'aria-hidden': 'true' }, String(num)) : icon(TYPE_ICON[s.type] || 'doc', 15)]
         : [disc || icon(TYPE_ICON[s.type] || 'doc', 15)];
-      const name = h('button', { class: 'sb-name', onclick: () => selectSection(s.id), oncontextmenu: (e) => { e.preventDefault(); rowMenu(name, s); } },
+      // Double-click any name to rename it right here (chapters, front and back matter, Contents…).
+      const name = h('button', { class: 'sb-name', title: 'Double-click to rename', onclick: (e) => { if (e.detail >= 2) renameInBinder(name, s, def.label || 'Title', label(s)); else selectSection(s.id); }, oncontextmenu: (e) => { e.preventDefault(); rowMenu(name, s); } },
         ...lead,
         ...rowDecor(s).slice(0, 1),
         h('span', { class: 'sb-label' }, label(s)),
         ...rowDecor(s).slice(1),
         s.exclude ? h('span', { class: 'sb-excl', title: 'Excluded from the book' }, icon('ignore', 13)) : null,
-        def.generated ? h('span', { class: 'sb-badge' }, 'Auto') : null);
+        null);
       const more = h('button', { class: 'sb-more', title: 'More', 'aria-label': 'More', onclick: (e) => { e.stopPropagation(); rowMenu(more, s); } }, icon('more', 16));
       li.append(name, more);
-      if (def.multi) {
-        li.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/x-section', s.id); e.dataTransfer.effectAllowed = 'move'; li.classList.add('dragging'); });
-        li.addEventListener('dragend', () => li.classList.remove('dragging'));
-        li.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('text/x-section')) { e.preventDefault(); li.classList.add('drop'); } });
-        li.addEventListener('dragleave', () => li.classList.remove('drop'));
-        li.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); li.classList.remove('drop'); reorder(e.dataTransfer.getData('text/x-section'), s.id); });
-      }
+      // Drag any row to put it elsewhere in its own part: chapters within the body, and front or
+      // back matter in whatever order you like (it can't leave its part).
+      li.addEventListener('dragstart', (e) => { dragGroup = g.id; e.dataTransfer.setData('text/x-section', s.id); e.dataTransfer.effectAllowed = 'move'; li.classList.add('dragging'); });
+      li.addEventListener('dragend', () => { dragGroup = null; li.classList.remove('dragging'); });
+      li.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('text/x-section') && dragGroup === g.id) { e.preventDefault(); li.classList.add('drop'); } });
+      li.addEventListener('dragleave', () => li.classList.remove('drop'));
+      li.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); li.classList.remove('drop'); reorder(e.dataTransfer.getData('text/x-section'), s.id); });
       ul.append(li);
       if (open) for (const [i, sc] of s.scenes.entries()) ul.append(sceneRow(s, sc, i));
     }
     const shut = collapsedGroups.has(g.id) && !filterActive();
     const head = h('button', { class: 'sb-head-btn', 'aria-expanded': String(!shut), title: shut ? `Show ${g.label}` : `Hide ${g.label}`, onclick: () => { if (collapsedGroups.has(g.id)) collapsedGroups.delete(g.id); else collapsedGroups.add(g.id); saveCollapsed(); refreshSidebar(); } },
-      h('span', { class: `sb-disc${shut ? '' : ' open'}` }, icon('next', 11)), h('span', { class: 'sb-head-label' }, g.label), included.length ? h('span', { class: 'sb-head-count' }, String(included.length)) : null);
+      // Just the name (click it to fold the part away or open it again).
+      h('span', { class: 'sb-head-label' }, g.label));
     scroller.append(h('section', { class: `sb-group sb-part sb-${g.id}${shut ? ' shut' : ''}` }, h('div', { class: 'sb-head' }, head, addBtn), shut ? null : ul));
   }
-  scroller.append(binRow());
+  scroller.append(coverRow('backCover'));
   sb.append(scroller, app.search.panel);
   sb.classList.toggle('searching', app.search.active);
   const total = enabledSections().reduce((n, s) => n + (SECTION_TYPES[s.type].generated ? 0 : countWords(app.contents[s.id])), 0);
   sb.append(h('div', { class: 'sb-foot' }, `${total.toLocaleString()} words`));
   els.docTitle.textContent = book.title || 'Untitled';
   document.title = `${book.title || 'Untitled'} — Lutefisk Book Editor`;
+  drawAuditBtn();
+  drawBinBtn();
+  auditSoon();
   updateStatus();
 }
 app.refreshSidebar = refreshSidebar;
+
+/* ---- Audit: no number in the binder — Audit turns red when there's something to fix, and
+   pointing at it says how much (the same count as the Audit window's To Fix). */
+let auditT = null, auditTimer = 0, auditRun = 0;
+function drawAuditBtn() {
+  const b = els.auditBtn;
+  if (!b) return;
+  const t = auditT?.book === app.book ? auditT : null;
+  // Red only for real issues; suggestions alone leave it as it is.
+  b.classList.toggle('issues', !!t?.issues);
+  b.classList.toggle('errors', !!t?.errors);
+  b.classList.toggle('clean', !!t && !t.issues);
+  const what = !t ? 'Checking the book…'
+    : t.toFix ? `${t.toFix.toLocaleString()} to fix — ${[t.errors ? `${t.errors} problem${t.errors === 1 ? '' : 's'}` : '', t.warns ? `${t.warns} to check` : '', t.infos ? `${t.infos} suggestion${t.infos === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`
+      : 'Nothing to fix';
+  b.title = `Audit — ${what}.\nClick to see the details. Checks titles, authors, covers, copyright, empty chapters, notes to self, and spelling and grammar.`;
+  b.setAttribute('aria-label', `Audit: ${what}`);
+}
+function auditSoon() {
+  clearTimeout(auditTimer);
+  auditTimer = setTimeout(async () => {
+    if (!app.book) return;
+    flushSerialize();
+    const me = ++auditRun, book = app.book;
+    try {
+      const t = await auditTally({ book, contents: app.contents, proofList, dialect: settings.spellDialect || 'american', alive: () => me === auditRun && app.book === book });
+      if (t && me === auditRun) { auditT = { ...t, book }; drawAuditBtn(); }
+    } catch { /* the next change tries again */ }
+  }, 2500);
+}
+app.openAudit = () => {
+  if (!app.book) return;
+  flushSerialize();
+  openAudit({ book: app.book, contents: app.contents, sheet, proofList, dialect: settings.spellDialect || 'american', go: auditGo,
+    markDirty: () => app.markDirty(),
+    // Close (resolve) comments from the Audit; the comment margin shows the change at once.
+    closeComments: (ids) => {
+      for (const id of ids) { const c = app.book.comments?.[id]; if (c) c.resolved = true; }
+      app.markDirty(); app.comments?.update?.();
+      toast(ids.length === 1 ? 'Comment closed' : `${ids.length} comments closed`, 'ok', 1600);
+    },
+    // The window's own numbers, the moment they change (ignore, restore, check again).
+    onTally: (t) => { auditRun++; clearTimeout(auditTimer); auditT = { ...t, book: app.book }; drawAuditBtn(); } });
+};
+/* ---- The Recycle Bin button in the title bar: how much is in it, when you point at it. */
+function drawBinBtn() {
+  const b = els.binBtn;
+  if (!b) return;
+  const n = app.book ? binCount(app.book) : 0;
+  b.hidden = !app.book;
+  b.classList.toggle('full', n > 0);
+  b.title = `Recycle Bin — ${n ? `${n} item${n === 1 ? '' : 's'}` : 'empty'}. Deleted chapters, scenes, index cards, random thoughts, characters and plot cards; restore them from here.`;
+  b.setAttribute('aria-label', `Recycle Bin${n ? `, ${n} item${n === 1 ? '' : 's'}` : ', empty'}`);
+}
+/** An Audit finding's button: go where it can be fixed. */
+function auditGo(w) {
+  if (!w || !app.book) return;
+  const afterOpen = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
+  switch (w.kind) {
+    case 'settings':
+      if (w.tab === 'cover') app.previewJump(w.focus === 'backCover' ? 'end' : 'cover');
+      openBookSettings(app, w.tab || 'general', { focus: w.focus });
+      break;
+    case 'enable': {
+      const s = app.book.sections.find((x) => x.type === w.type);
+      if (!s) { toast('Add it from the + beside Front Matter or Back Matter', 'info', 2500); return; }
+      s.enabled = true; app.markDirty(); refreshSidebar();
+      if (!SECTION_TYPES[s.type]?.generated) selectSection(s.id); else app.previewJump(s.id);
+      toast(`${SECTION_TYPES[s.type].label} added`, 'ok', 1600);
+      break;
+    }
+    case 'add-chapter': addSection('chapter'); break;
+    case 'character': openCast(w.id, { keepPlace: true }); break;
+    case 'characters': openCast(undefined, { keepPlace: true }); break;
+    case 'comments': setCommentsHidden(false); break;
+    case 'section':
+      selectSection(w.id);
+      if (w.focusTitle) afterOpen(() => { if (!els.secTitle.hidden) els.secTitle.focus(); });
+      break;
+    case 'find':
+      selectSection(w.id);
+      afterOpen(() => {
+        const re = new RegExp(String(w.text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gu');
+        if (app.editor.search(re, 0)) { app.editor.focus(); setTimeout(() => app.editor.clearSearch(), 4000); }
+      });
+      break;
+    case 'proof':
+      selectSection(w.id);
+      afterOpen(() => checkSpellingNow('both'));
+      break;
+    default: break;
+  }
+}
 
 /* ---- labels, statuses and export inclusion, shared by chapter and scene menus.
    Labels and statuses are per book (book.labels, book.statuses); the defaults
@@ -1506,8 +1662,9 @@ function rowMenu(anchor, s) {
     } });
   }
   if (!def.generated) items.push('-');
+  // Move Up / Move Down for every row (front and back matter too).
+  items.push({ label: 'Move Up', icon: 'up', onClick: () => moveSection(s.id, -1) }, { label: 'Move Down', icon: 'down', onClick: () => moveSection(s.id, 1) });
   if (def.multi) {
-    items.push({ label: 'Move Up', icon: 'up', onClick: () => moveSection(s.id, -1) }, { label: 'Move Down', icon: 'down', onClick: () => moveSection(s.id, 1) });
     if (SCENE_TYPES.includes(s.type)) {
       items.push('-');
       if (hasScenes(s)) items.push({ label: 'Combine Scenes into Chapter', icon: 'doc', onClick: () => combineScenes(s) });
@@ -1583,24 +1740,39 @@ async function deleteSection(id) {
   else refreshSidebar();
 }
 
+// The part (front, body, back) of the row being dragged: rows only take drops from their own part.
+let dragGroup = null;
+const groupOf = (s) => SECTION_TYPES[s?.type]?.group;
+/** Front or back matter moved by hand keeps its order from now on (see ensureSections). */
+function ownOrder(group) {
+  if (group !== 'front' && group !== 'back') return;
+  const b = app.book;
+  b.matterOrder = [...new Set([...(Array.isArray(b.matterOrder) ? b.matterOrder : []), group])];
+}
+/** Move a section one place up (-1) or down (1) among the shown sections of its part. */
 function moveSection(id, dir) {
   const list = app.book.sections;
   const i = list.findIndex((s) => s.id === id);
-  const type = list[i].type;
+  if (i < 0) return;
+  const grp = groupOf(list[i]);
+  // Body: chapters swap with chapters; front and back matter: any neighbor that's shown.
+  const shown = (s) => groupOf(s) === grp && (grp === 'body' ? s.type === list[i].type : s.enabled !== false || SECTION_TYPES[s.type].multi);
   let j = i + dir;
-  while (j >= 0 && j < list.length && list[j].type !== type) j += dir;
-  if (j < 0 || j >= list.length) return;
+  while (j >= 0 && j < list.length && !shown(list[j])) j += dir;
+  if (j < 0 || j >= list.length || groupOf(list[j]) !== grp) return;
   [list[i], list[j]] = [list[j], list[i]];
-  app.markDirty(); refreshSidebar(); schedulePreview();
+  ownOrder(grp);
+  app.markDirty(); app.htmlCache?.clear?.(); refreshSidebar(); schedulePreview(false, true);
 }
 function reorder(fromId, toId) {
   const list = app.book.sections;
   const from = list.findIndex((s) => s.id === fromId);
   const to = list.findIndex((s) => s.id === toId);
-  if (from < 0 || to < 0 || from === to || list[from].type !== list[to].type) return;
+  if (from < 0 || to < 0 || from === to || groupOf(list[from]) !== groupOf(list[to])) return;
   const [s] = list.splice(from, 1);
   list.splice(to, 0, s);
-  app.markDirty(); refreshSidebar(); schedulePreview();
+  ownOrder(groupOf(s));
+  app.markDirty(); app.htmlCache?.clear?.(); refreshSidebar(); schedulePreview(false, true);
 }
 
 function selectSection(id, goTo) {
@@ -1655,7 +1827,7 @@ function sceneLabel(sc, i) {
 function sceneRow(chapter, sc, i) {
   const active = sc.id === app.currentId;
   const li = h('li', { class: `sb-row scene${active ? ' active' : ''}${sc.exclude ? ' excluded' : ''}${filterActive() ? (matchesFilter(sc) ? ' hit' : ' dim') : ''}`, title: sc.exclude ? 'Excluded from the book' : null, role: 'option', 'aria-selected': String(active), draggable: 'true', tabindex: -1 });
-  const name = h('button', { class: 'sb-name', onclick: () => selectSection(sc.id), oncontextmenu: (e) => { e.preventDefault(); sceneMenu(name, chapter, sc); } },
+  const name = h('button', { class: 'sb-name', title: 'Double-click to rename', onclick: (e) => { if (e.detail >= 2) renameInBinder(name, sc, `Scene ${i + 1}`); else selectSection(sc.id); }, oncontextmenu: (e) => { e.preventDefault(); sceneMenu(name, chapter, sc); } },
     icon('scene', 14), ...rowDecor(sc).slice(0, 1), h('span', { class: 'sb-label' }, sceneLabel(sc, i)), ...rowDecor(sc).slice(1), sc.exclude ? h('span', { class: 'sb-excl', title: 'Excluded from the book' }, icon('eyeOff', 13)) : null);
   const more = h('button', { class: 'sb-more', title: 'More', 'aria-label': 'More', onclick: (e) => { e.stopPropagation(); sceneMenu(more, chapter, sc); } }, icon('more', 16));
   li.append(name, more);
@@ -1665,6 +1837,45 @@ function sceneRow(chapter, sc, i) {
   li.addEventListener('dragleave', () => li.classList.remove('drop'));
   li.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); li.classList.remove('drop'); moveSceneTo(e.dataTransfer.getData('text/x-scene'), chapter, chapter.scenes.indexOf(sc)); });
   return li;
+}
+
+/* ---- Rename in the binder: double-click a chapter or scene; Return keeps it, Esc puts it back. */
+let binderRename = null;
+function renameInBinder(btn, node, placeholder = 'Title', shown = '') {
+  if (binderRename) return;
+  const li = btn.closest('li');
+  if (!li) return;
+  const before = node.title || '';
+  // A page without its own title (Dedication, Contents…) starts from the name it shows.
+  const start = before || (node.type && node.type !== 'chapter' ? shown : '');
+  const input = h('input', { class: 'sb-rename', value: start, placeholder, 'aria-label': 'Name', spellcheck: 'true' });
+  binderRename = { pending: false };
+  li.draggable = false;
+  // The field takes the row's place (a field can't sit inside the row's button).
+  btn.hidden = true;
+  li.insertBefore(input, btn);
+  input.focus(); input.select();
+  let done = false;
+  const finish = (keep) => {
+    if (done) return; done = true;
+    const v = input.value.replace(/\s+/g, ' ').trim();
+    binderRename = null;
+    if (keep && v !== before && !(!before && v === start)) {
+      if (v) node.title = v; else node.title = '';
+      app.markDirty(); app.htmlCache?.clear?.(); schedulePreview();
+      // The title above the editor shows the new name too.
+      if (node.id === app.currentId && els.secTitle) els.secTitle.value = node.title || '';
+    }
+    refreshSidebar();
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  // Clicks in the field stay in the field (not the row underneath).
+  for (const ev of ['click', 'mousedown', 'dblclick']) input.addEventListener(ev, (e) => e.stopPropagation());
 }
 
 /** Statistics sheet for a chapter, section or scene. */
@@ -1869,6 +2080,9 @@ function newCard({ text = '', title = '', folder = null, from = null, onClose } 
 function openCardEditor(r, { onClose, fresh = false } = {}) {
   flushSerialize();
   let gone = false;
+  // As it was when the window opened, for Cancel.
+  const before = { title: r.title, label: r.label, text: app.contents[r.id] || '' };
+  let cancelled = false;
   const title = h('input', { type: 'text', class: 'card-title', placeholder: 'Title', 'aria-label': 'Card title' });
   title.value = r.title || '';
   title.addEventListener('input', () => { r.title = title.value; app.markDirty(); });
@@ -1881,10 +2095,27 @@ function openCardEditor(r, { onClose, fresh = false } = {}) {
   } }, icon('trash', 13), 'Delete');
   // Just the title and the card's text (where it came from is written at the top of the text).
   const body = h('div', { class: 'card-ed' }, h('div', { class: 'card-top' }, title), ed.el);
+  // Cancel: leave without keeping anything — a new card goes away, an existing one goes back to how it was.
+  const cancelBtn = h('button', { type: 'button', class: 'btn small', title: fresh ? 'Cancel — don’t keep this card' : 'Cancel — put the card back as it was', onclick: () => { cancelled = true; close(); } }, 'Cancel');
+  // Removed outright (it was never kept, so not to the Recycle Bin).
+  const discard = () => {
+    app.book.research = app.book.research.filter((x) => x !== r);
+    app.removedNotes.push(r.id); app.dirtyNotes.delete(r.id); delete app.contents[r.id];
+    app.markDirty();
+  };
   const close = sheet('Index Card', body, {
-    actions: h('div', { class: 'card-actions' }, delBtn),
+    actions: h('div', { class: 'card-actions' }, delBtn, cancelBtn),
     onClose: () => {
-      if (!gone && findResearch(r.id)) { app.contents[r.id] = ed.markdown(); app.dirtyNotes.add(r.id); if (!r.title?.trim()) r.title = 'Untitled card'; }
+      // Nothing added: unchanged, and it started with no quoted text (only, perhaps, the line saying
+      // where it came from). A card made from selected text already holds that text, so it's kept.
+      const bare = (md) => String(md || '').replace(/^\s*[*_][^\n]*[*_]\s*(\n|$)/, '').trim();
+      const nothingWritten = !bare(ed.markdown()) && !bare(before.text);
+      if (gone || !findResearch(r.id)) { /* deleted */ }
+      else if (cancelled && fresh) discard();
+      else if (cancelled) { r.title = before.title; if (before.label) r.label = before.label; else delete r.label; app.contents[r.id] = before.text; app.markDirty(); }
+      // A new card closed without anything written in it isn't kept.
+      else if (fresh && nothingWritten && (!title.value.trim() || title.value === before.title)) discard();
+      else { app.contents[r.id] = ed.markdown(); app.dirtyNotes.add(r.id); if (!r.title?.trim()) r.title = 'Untitled card'; }
       ed.destroy();
       refreshSidebar();
       onClose?.();
@@ -1946,24 +2177,59 @@ function openIndexCards({ onChange } = {}) {
       return card;
     }), h('button', { type: 'button', class: 'ixc-card add', onclick: () => newCard({ onClose: changed }),
       ondragover: (e) => { if (dragId) e.preventDefault(); }, ondrop: (e) => { e.preventDefault(); if (dragId) move(dragId, null); } },
-    icon('plus', 22), h('span', {}, 'New Index Card')));
+    icon('plus', 22), h('span', {}, 'Add Card')));
   }
   const count = h('span', { class: 'ixc-count' });
   const body = h('div', { class: 'ixc' },
-    h('p', { class: 'ixc-hint' }, 'Click a card to read or edit it. Drag cards to put them in order. Right-click in your text › New Index Card to make one from what you’ve selected.'),
+    h('p', { class: 'ixc-hint' }, 'Click a card to read or edit it. Drag cards to put them in order. Right-click in your text › Add Card to make one from what you’ve selected.'),
     grid);
   draw();
   sheet('Index Cards', body, { wide: true, actions: count });
 }
 /**
  * Binder right-click: index cards for this chapter or scene — Insert Index Card ▸ (a card ▸
- * where it goes) when Research has cards, and New Index Card.
+ * where it goes) when Research has cards, and Add Card.
  */
 function binderCardItems(chapter, sceneIndex = null) {
   // For now index cards only go into Research (putting them back in the book comes later).
   if (!SCENE_TYPES.includes(chapter.type) && chapter.type !== 'chapter') return [];
   const id = sceneIndex != null ? chapter.scenes?.[sceneIndex]?.id || chapter.id : chapter.id;
-  return [{ label: 'New Index Card', icon: 'card', onClick: () => newCard({ from: noteWhere(id) }) }, '-'];
+  return [{ label: 'Add Card', icon: 'card', onClick: () => newCard({ from: noteWhere(id) }) }, '-'];
+}
+
+/* ---- Random Thoughts */
+// Where the last right-click was, so the quick box opens right there.
+let lastMenuAt = null;
+document.addEventListener('contextmenu', (e) => { lastMenuAt = { x: e.clientX, y: e.clientY }; }, true);
+function newThoughtAtMouse(text = '') {
+  if (!app.book) return;
+  quickThought({ book: app.book, text: String(text || '').trim(), where: noteWhere(), x: lastMenuAt?.x, y: lastMenuAt?.y,
+    markDirty: () => app.markDirty(), onChange: drawThoughtsBtn,
+    done: () => { if (!els.editorMount.hidden) app.editor.focus(); } });
+}
+function showThoughts() {
+  if (!app.book) return;
+  openThoughts({ book: app.book, sheet, where: noteWhere(), goTo: goThought, markDirty: () => app.markDirty(), onChange: () => { drawThoughtsBtn(); refreshSidebar(); },
+    onClose: () => { if (!els.editorMount.hidden) app.editor.focus(); } });
+}
+/** A thought's place: open that chapter, scene or research item, and find the highlighted text in it. */
+function goThought(th) {
+  const w = th?.where;
+  if (!w || !app.book) return;
+  const id = w.research || w.scene || w.section;
+  if (!id || !(findResearch(id) || findScene(id) || app.book.sections.some((x) => x.id === id))) { toast('That place isn’t in the book any more', 'info', 2200); return; }
+  selectSection(id);
+  if (!th.quote) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const words = th.quote.split(/\s+/).slice(0, 8).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp(words.join('\\s+'), 'gu');
+    if (app.editor.search?.(re, 0)) { app.editor.focus(); setTimeout(() => app.editor.clearSearch?.(), 4000); }
+  }));
+}
+function drawThoughtsBtn() {
+  const b = els.thoughtsBtn;
+  if (!b || !app.book) return;
+  b.title = 'Random Thoughts';
 }
 
 /** ⌥⌘N: a new scene after the current one (or at the end of the chapter). */
@@ -2174,8 +2440,7 @@ function openChapterInsights(chapter) {
 /**
  * Research: the book's research/README.md — Markdown on the left (with buttons for common
  * formatting), a preview on the right — saved as you type and on Done/Esc. Its bar: Upload
- * Files…, Open Containing Folder, Index Cards (all of them: open one to read, edit or delete
- * it; or make a new one), Bibliography; and Characters, Plot and Timeline. Uploaded files are listed
+ * Files…, Open Containing Folder, Index Cards, Random Thoughts, Bibliography; and Characters, Plot and Timeline. Uploaded files are listed
  * under the notes; pictures go into the notes as you upload them.
  */
 async function openResearchHub() {
@@ -2366,9 +2631,9 @@ async function openResearchHub() {
             : h('span', { class: 'cr-file-ext' }, icon(f.image ? 'image' : 'doc', 22), h('b', {}, ext(f.name)))),
         h('div', { class: 'cr-file-info' },
           h('span', { class: 'cr-file-name', title: f.name }, f.name),
-          h('small', {}, [sizeText(f.size || 0), used ? 'in your notes' : ''].filter(Boolean).join(' · '))),
+          h('small', {}, [sizeText(f.size || 0), used ? 'in README.md' : ''].filter(Boolean).join(' · '))),
         h('div', { class: 'cr-file-acts' },
-          f.image ? h('button', { type: 'button', class: 'tb-btn', title: 'Insert into Notes — add this picture at the cursor', 'aria-label': 'Insert into Notes', onclick: () => { insert(picMd(f.name)); drawFiles(); } }, icon('plus', 14)) : null,
+          f.image ? h('button', { type: 'button', class: 'tb-btn', title: 'Insert into README.md — add this picture at the cursor', 'aria-label': 'Insert into README.md', onclick: () => { insert(picMd(f.name)); drawFiles(); } }, icon('plus', 14)) : null,
           h('button', { type: 'button', class: 'tb-btn', title: `Open “${f.name}”`, 'aria-label': 'Open', onclick: () => open(f) }, icon('share', 14))));
     }) : [h('div', { class: 'cr-nofiles' }, icon('download', 16), h('span', {}, 'No files yet. Use Upload Files… to keep pictures, PDFs and documents with this book’s research.'))]));
   };
@@ -2380,7 +2645,7 @@ async function openResearchHub() {
       if (!got?.length) return;
       const pics = insertPictures ? got.filter((f) => f.image) : [];
       if (pics.length) insert(pics.map((f) => picMd(f.name)).join('\n\n'));
-      toast(pics.length ? `Added ${pics.length === 1 ? 'the picture' : `${pics.length} pictures`} to your notes` : `Uploaded ${got.length} file${got.length === 1 ? '' : 's'} — see Files, under your notes`, 'ok', 2000);
+      toast(pics.length ? `Added ${pics.length === 1 ? 'the picture' : `${pics.length} pictures`} to README.md` : `Uploaded ${got.length} file${got.length === 1 ? '' : 's'} — see Files, under README.md`, 'ok', 2000);
       drawFiles();
     } catch (err) { toast(clean(err), 'error'); }
   }
@@ -2393,6 +2658,12 @@ async function openResearchHub() {
   drawCardsBtn();
   const afterCard = () => { drawCardsBtn(); refreshSidebar(); };
   cardsBtn.addEventListener('click', () => openIndexCards({ onChange: afterCard }));
+
+  /* Random Thoughts: all of them, to add, edit or delete (the same as the bubble above the editor). */
+  const thoughtsLink = h('button', { type: 'button', class: 'cr-story', title: 'Random Thoughts — add, edit or delete your thoughts' });
+  const drawThoughtsLink = () => { const n = thoughtsOf(app.book).length; thoughtsLink.replaceChildren(...[icon('thought', 16), h('span', {}, 'Random Thoughts'), n ? h('span', { class: 'cr-count' }, String(n)) : null].filter(Boolean)); };
+  drawThoughtsLink();
+  thoughtsLink.addEventListener('click', () => openThoughts({ book: app.book, sheet, goTo: (th) => { closeHub?.(); goThought(th); }, markDirty: () => app.markDirty(), onChange: () => { drawThoughtsLink(); drawThoughtsBtn(); } }));
 
   /* Bibliography: the book's sources (closes Research and opens the Bibliography section). */
   const bibBtn = h('button', { type: 'button', class: 'cr-story', title: 'Bibliography — the sources for this book: add, edit and format them', onclick: () => { closeHub(); openBibliography(); } }, icon('cite', 16), h('span', {}, 'Bibliography'));
@@ -2407,14 +2678,14 @@ async function openResearchHub() {
       castStory,
       story('plot', 'Plot', 'Plot — plotlines and chapters on a board of cards', () => openPlotBoard('board')),
       story('timeline', 'Timeline', 'Timeline — events in the order they happen in the story', () => openPlotBoard('timeline')),
-      cardsBtn, bibBtn),
+      cardsBtn, thoughtsLink, bibBtn),
     h('div', { class: 'cr-bar' },
-      chip('download', 'Upload Files…', 'Upload Files — copy pictures, PDFs, documents or anything else into Research; they’re listed under Files, below your notes', () => upload()),
+      chip('download', 'Upload Files…', 'Upload Files — copy pictures, PDFs, documents or anything else into Research; they’re listed under Files, below README.md', () => upload()),
       chip('folderOpen', 'Open Containing Folder', `Open Containing Folder — ${doc.dir}`, () => B.research.reveal().catch((err) => toast(clean(err), 'error'))),
     ),
     h('div', { class: 'cf-path cr-path', title: doc.path }, doc.path),
     fbar,
-    h('div', { class: 'cr-split' }, h('div', { class: 'cr-pane' }, h('div', { class: 'cr-pane-head' }, 'Notes'), area), h('div', { class: 'cr-pane' }, h('div', { class: 'cr-pane-head' }, 'Preview'), view)),
+    h('div', { class: 'cr-split' }, h('div', { class: 'cr-pane' }, h('div', { class: 'cr-pane-head' }, 'README.md'), area), h('div', { class: 'cr-pane' }, h('div', { class: 'cr-pane-head' }, 'Preview'), view)),
     filesEl);
   const closeHub = sheet('Research', body, {
     wide: true,
@@ -2428,12 +2699,31 @@ const collapsedGroups = new Set((() => { try { return JSON.parse(localStorage.ge
 function saveCollapsed() { try { localStorage.setItem('lutefisk.binderCollapsed', JSON.stringify([...collapsedGroups])); } catch { /* storage unavailable */ } }
 
 /* ---- Recycle Bin */
-function binRow() {
-  const n = binCount(app.book);
-  return h('section', { class: 'sb-group nav-group bin-group' }, h('ul', { class: 'sb-list' },
-    h('li', { class: 'sb-row nav' }, h('button', { class: 'sb-name sb-bin', title: 'Recycle Bin — deleted chapters, scenes, index cards, characters and plot cards. Restore them from here.', onclick: () => openBin() },
-      icon('trash', 15), h('span', { class: 'sb-label' }, 'Recycle Bin'), n ? h('span', { class: 'sb-count' }, String(n)) : null))));
+/**
+ * Front Cover / Back Cover in the binder: shows that cover in the preview and opens
+ * Book › Covers at it. The note at the right says what the cover is made of.
+ */
+function coverRow(key) {
+  const b = app.book;
+  const front = key === 'cover';
+  const label = front ? 'Front Cover' : 'Back Cover';
+  const state = b[key] ? 'Image' : front ? 'Generated' : b.description?.trim() ? 'Description' : 'Not set';
+  const tip = front
+    ? (b[key] ? 'Front Cover — your cover image. Click to see it in the preview and change it.' : 'Front Cover — made from the title and author until you add an image. Click to see it and add one.')
+    : (b[key] ? 'Back Cover — your back-cover image. Click to see it in the preview and change it.' : b.description?.trim() ? 'Back Cover — made from the book’s description. Click to see it and add an image.' : 'Back Cover — not set yet. Add an image or a description.');
+  const active = app.previewSpecial === (front ? 'cover' : 'end');
+  return h('section', { class: `sb-group nav-group sb-cover-group ${front ? 'front' : 'back'}` }, h('ul', { class: 'sb-list' },
+    h('li', { class: `sb-row nav sb-cover-row${active ? ' active' : ''}` }, h('button', { class: 'sb-name', title: tip, onclick: () => {
+      app.previewJump(front ? 'cover' : 'end');
+      openBookSettings(app, 'cover', { focus: key });
+    } }, icon(front ? 'cover' : 'book', 15), h('span', { class: 'sb-label' }, label), state === 'Not set' ? h('span', { class: 'sb-count sb-cover-state unset' }, state) : null))));
 }
+
+/** The binder's cover rows light up while the preview shows that cover. */
+function markCoverRows() {
+  for (const r of els.sidebar?.querySelectorAll('.sb-cover-row') || []) r.classList.toggle('active', (r.closest('.front') ? 'cover' : 'end') === app.previewSpecial);
+}
+
 function openBin() { openRecycleBin(app, sheet, { restore: restoreFromBin, onChange: () => { refreshSidebar(); app.refreshPreview(true); } }); }
 /** Put a Recycle Bin entry back where it was. Returns true when restored. */
 function restoreFromBin(e) {
@@ -2511,6 +2801,13 @@ function restoreFromBin(e) {
       b.research = Array.isArray(b.research) ? b.research : [];
       b.research.push(item); putText(item.id, it.text || '', true);
       app.markDirty(); toast('Restored as an index card in Research', 'info', 2200);
+      return true;
+    }
+    case 'thought': {
+      b.thoughts = thoughtsOf(b);
+      if (b.thoughts.some((x) => x.id === it.id)) return true;
+      b.thoughts.splice(Math.min(e.where?.index ?? b.thoughts.length, b.thoughts.length), 0, it);
+      app.markDirty(); drawThoughtsBtn();
       return true;
     }
     case 'todo': b.todos = Array.isArray(b.todos) ? b.todos : []; b.todos.push(it); app.markDirty(); return true;
@@ -2914,7 +3211,7 @@ function collectNotes() {
 function schedulePreview(fromEditor = false, jump = false) {
   if (jump) pendingGoTo ||= 'caret';
   if (fromEditor) { followCaret = true; app.previewSpecial = null; }
-  if (!frame) frame = requestAnimationFrame(() => { frame = 0; safePreview(); });
+  if (!frame) frame = requestAnimationFrame(() => { frame = 0; safePreview(); markCoverRows(); });
   safely(updateStatusSoon, 'word counts');
 }
 /** Run something that mustn't break typing or the preview; a problem is logged and shown once. */
@@ -3145,6 +3442,8 @@ function loadBookData(data) {
   }
   book.uuid ||= crypto.randomUUID();
   ensureSections(book);
+  // The logline is gone (the description says what the book is about): an old one becomes the description if there isn't one.
+  if ('logline' in book) { if (!String(book.description || '').trim() && String(book.logline || '').trim()) book.description = book.logline.trim(); delete book.logline; }
   // Chapter folders are gone (Research is one folder for the book now).
   delete book.chapterFolders;
   for (const s of book.sections) { delete s.folder; delete s.folderArchive; }
@@ -3203,6 +3502,7 @@ function loadBookData(data) {
   if (!book.sentenceSpacing && settings.sentenceSpacing === 'two') book.sentenceSpacing = 'two';
   applyBookTypography();
   if (migratedCards) { app.markDirty(); setTimeout(() => toast(`Your research notes, scenes and snippets are index cards now (${migratedCards}) — open Research to see them`, 'info', 5000), 800); }
+  drawThoughtsBtn();
   const first = book.sections.find((s) => s.type === 'chapter') || book.sections[0];
   selectSection(first.id);
   setView('device');
@@ -3269,6 +3569,7 @@ B.onMenu(async (cmd) => {
     case 'view-device': if (app.book) { togglePreview(true); setView('device'); } return undefined;
     case 'view-print': if (app.book) { togglePreview(true); setView('print'); } return undefined;
     case 'view-stats': return app.book && app.openInsights();
+    case 'audit-book': return app.book && app.openAudit();
     case 'zoom-in': return zoom(1);
     case 'zoom-out': return zoom(-1);
     case 'zoom-reset': return zoom(0);

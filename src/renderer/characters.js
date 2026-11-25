@@ -5,7 +5,7 @@
 import { h, icon, confirmDialog, popover, closePopovers, assetUrl, toast } from './ui.js';
 import { toBin } from './bin.js';
 import { AVATARS, avatarSvg, squareAvatar, AVATAR_PX } from './avatars.js';
-import { ROLES, DEFAULT_ATTRIBUTES, CHARACTER_COLORS, newCharacter, appearances, characterNames } from '../shared/characters.js';
+import { ROLES, DEFAULT_ATTRIBUTES, RETIRED_ATTRIBUTES, CHARACTER_COLORS, newCharacter, appearances, characterNames } from '../shared/characters.js';
 import { newId } from '../shared/sections.js';
 
 const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
@@ -89,12 +89,9 @@ export function openCharacters(ctx, sheet, { select } = {}) {
   function drawList() {
     const shown = list.filter((c) => !filter || [c.name, c.role, ...(c.aliases || [])].join(' ').toLowerCase().includes(filter));
     listEl.replaceChildren(...shown.map((c) => {
-      const a = apps.get(c.id) || [];
-      const mentions = a.reduce((n, x) => n + x.count, 0);
       const row = h('button', { class: `ch-row${c.id === current ? ' active' : ''}`, role: 'option', 'aria-selected': String(c.id === current), onclick: () => { current = c.id; drawList(); drawDetail(); } },
         avatar(c, 34),
-        h('span', { class: 'ch-row-text' }, h('b', {}, c.name || 'Unnamed'), h('small', {}, [c.role, a.length ? `${a.length} ${unitWord}${a.length === 1 ? '' : 's'}` : `not in the ${'book'} yet`].filter(Boolean).join(' · '))),
-        mentions ? h('span', { class: 'ch-row-n', title: `${mentions} mentions` }, String(mentions)) : null);
+        h('span', { class: 'ch-row-text' }, h('b', {}, c.name || 'Unnamed'), c.role ? h('small', {}, c.role) : null));
       return row;
     }), ...(list.length ? [] : [h('p', { class: 'hint ch-empty-side' }, 'No characters yet.')]));
   }
@@ -119,9 +116,8 @@ export function openCharacters(ctx, sheet, { select } = {}) {
     const c = list.find((x) => x.id === current);
     if (!c) { drawEmpty(); return; }
     c.attrs ||= [];
-    const a = apps.get(c.id) || [];
-    const mentions = a.reduce((n, x) => n + x.count, 0);
-
+    // Appearance, Personality, Goal and Motivation no longer come with a character: drop them while empty.
+    if (c.attrs.some((x) => RETIRED_ATTRIBUTES.includes(x.k) && !String(x.v || '').trim())) { c.attrs = c.attrs.filter((x) => !(RETIRED_ATTRIBUTES.includes(x.k) && !String(x.v || '').trim())); save(); }
     const av = h('button', { class: 'ch-av-btn', title: 'Avatar — choose a color and an icon, or upload a picture', onclick: () => avatarPopover(av, c, () => { save(); drawList(); drawDetail(); }) }, avatar(c, 64), h('span', { class: 'ch-av-edit' }, icon('pen', 12)));
     const name = h('input', { class: 'ch-name', value: c.name || '', placeholder: 'Character name', 'aria-label': 'Name', spellcheck: 'false' });
     name.addEventListener('input', () => { c.name = name.value; save(); drawList(); av.replaceChildren(avatar(c, 64)); });
@@ -130,8 +126,6 @@ export function openCharacters(ctx, sheet, { select } = {}) {
     role.addEventListener('input', () => { c.role = role.value; save(); drawList(); });
     const aliases = h('input', { type: 'text', value: (c.aliases || []).join(', '), placeholder: 'Nicknames, titles… separated by commas', 'aria-label': 'Also known as' });
     aliases.addEventListener('change', () => { c.aliases = aliases.value.split(',').map((x) => x.trim()).filter(Boolean); save(); recount(); drawList(); drawApp(); });
-    const first = h('input', { type: 'checkbox', checked: c.matchFirst !== false });
-    first.addEventListener('change', () => { c.matchFirst = first.checked; save(); recount(); drawList(); drawApp(); });
     const del = h('button', { class: 'btn small plain danger', onclick: async () => {
       if (!(await confirmDialog(`Delete ${c.name || 'this character'}?`, 'They move to the Recycle Bin, where you can restore them. Your manuscript isn’t changed.'))) return;
       toBin(book, { kind: 'character', title: c.name || 'Unnamed character', item: c, where: { index: list.indexOf(c), cards: (book.plot?.cards || []).filter((k) => (k.chars || []).includes(c.id)).map((k) => k.id) } });
@@ -141,10 +135,7 @@ export function openCharacters(ctx, sheet, { select } = {}) {
     } }, icon('trash', 14), 'Delete');
 
     const head = h('div', { class: 'ch-head' }, av,
-      h('div', { class: 'ch-head-main' }, name, h('div', { class: 'ch-head-sub' }, role, h('datalist', { id: 'ch-roles' }, ROLES.map((r) => h('option', { value: r }))))),
-      h('div', { class: 'ch-head-stats' },
-        h('div', {}, h('b', {}, String(a.length)), h('span', {}, `${unitWord}${a.length === 1 ? '' : 's'}`)),
-        h('div', {}, h('b', {}, mentions.toLocaleString()), h('span', {}, mentions === 1 ? 'mention' : 'mentions'))));
+      h('div', { class: 'ch-head-main' }, name, h('div', { class: 'ch-head-sub' }, role, h('datalist', { id: 'ch-roles' }, ROLES.map((r) => h('option', { value: r }))))));
 
     // Attributes
     const attrsEl = h('div', { class: 'ch-attrs' });
@@ -171,26 +162,16 @@ export function openCharacters(ctx, sheet, { select } = {}) {
     notes.addEventListener('input', () => { c.notes = notes.value; save(); });
 
     const appEl = h('div', { class: 'ch-app' });
+    // Appears in: just the chapters they're in, by number (click one to go there).
     function drawApp() {
       const a2 = apps.get(c.id) || [];
-      const max = Math.max(1, ...a2.map((x) => x.count));
-      const byId = new Map(a2.map((x) => [x.id, x]));
-      const total = a2.reduce((n, x) => n + x.count, 0);
-      const first2 = a2[0];
-      appEl.replaceChildren(
-        h('p', { class: 'ch-app-sum' }, a2.length
-          ? `In ${a2.length} of ${units.length} ${unitWord}s · ${total.toLocaleString()} mention${total === 1 ? '' : 's'} · first in ${first2.title}`
-          : `${c.name ? `“${characterNames(c).join('”, “')}” doesn’t appear` : 'Add a name to find this character'} in the ${'manuscript'} yet.`),
-        units.length ? h('div', { class: 'ch-strip', role: 'img', 'aria-label': `Mentions by ${unitWord}` }, units.map((u) => {
-          const x = byId.get(u.id);
-          return h('button', { class: `ch-cell${x ? ' on' : ''}`, title: `${u.title}: ${x ? `${x.count} mention${x.count === 1 ? '' : 's'} — click to go there` : 'not in this one'}`, style: x ? { '--a': String(0.25 + 0.75 * (x.count / max)), '--c': c.color } : {}, disabled: !x, 'aria-disabled': String(!x), onclick: x ? () => ctx.jump(u.id) : null }, h('span', {}, u.short || ''));
-        })) : null,
-        a2.length ? h('div', { class: 'ch-app-list' }, a2.map((x) => h('button', { class: 'ch-app-row', onclick: () => ctx.jump(x.id), title: `Go to ${x.title}` },
-          h('span', { class: 'ch-app-t' }, x.title),
-          h('span', { class: 'ch-app-bar' }, h('i', { style: { width: `${(x.count / max) * 100}%`, background: c.color } })),
-          h('span', { class: 'ch-app-n' }, `${x.count}×`),
-          (units[x.index]?.parts || []).length ? h('span', { class: 'ch-app-parts' }, units[x.index].parts.filter((p) => p.count(c)).map((p) => h('span', { class: 'ch-part' }, p.title))) : null,
-          icon('next', 13)))) : null);
+      if (!c.name?.trim()) { appEl.replaceChildren(h('p', { class: 'ch-app-none' }, 'Add a name to find this character.')); return; }
+      if (!a2.length) { appEl.replaceChildren(h('p', { class: 'ch-app-none' }, 'Not in any chapter yet.')); return; }
+      appEl.replaceChildren(h('div', { class: 'ch-app-nums' }, a2.map((x) => {
+        const u = units[x.index] || {};
+        const label = u.short && u.short !== '–' ? u.short : (u.title || '?');
+        return h('button', { type: 'button', class: 'ch-app-num', title: `${u.title || 'Untitled'} — go there`, onclick: () => ctx.jump(x.id) }, label);
+      })));
     }
     drawApp();
 
@@ -202,19 +183,22 @@ export function openCharacters(ctx, sheet, { select } = {}) {
           h('section', { class: 'ch-sec' }, h('h3', {}, 'Notes'), notes)),
         h('div', { class: 'ch-col' },
           h('section', { class: 'ch-sec' }, h('h3', {}, 'Appears in'), appEl),
-          h('section', { class: 'ch-sec' }, h('h3', {}, 'Found by'),
-            h('label', { class: 'fld' }, h('span', {}, 'Also known as'), aliases),
-            h('label', { class: 'ch-check' }, first, h('span', {}, `Match the first name on its own${(c.name || '').trim().includes(' ') ? ` (“${c.name.trim().split(/\s+/)[0]}”)` : ''}`)),
-            h('small', { class: 'hint' }, 'Names match as whole words with the same capitals, so “Will” isn’t found in “will”.')),
+          h('section', { class: 'ch-sec' }, h('h3', {}, 'Also known as'), aliases),
           h('div', { class: 'ch-foot' }, del))));
   }
 
   drawList();
   drawDetail();
-  const helpBtn = ctx.help ? h('button', { class: 'btn small plain', title: 'A step-by-step walkthrough of Characters', onclick: () => ctx.help('characters') }, icon('help', 14), 'How It Works') : null;
   // Import from Another Book…: the window opens again with the new characters in it.
-  const importBtn = ctx.importFromBook ? h('button', { class: 'btn small plain', title: 'Bring characters over from another of your books (their pictures come too)', onclick: () => ctx.importFromBook(importBtn, () => { close(); openCharacters(ctx, sheet, {}); }) }, icon('download', 14), 'Import from Another Book…') : null;
-  const close = sheet('Characters', body, { full: true, actions: h('span', { class: 'ch-actions' }, importBtn, helpBtn), onClose: () => ctx.onClose?.() });
+  const importBtn = ctx.importFromBook ? h('button', { class: 'btn small plain', title: 'Bring characters over from another of your books (their pictures come too)', onclick: () => ctx.importFromBook(importBtn, () => { close(); openCharacters(ctx, sheet, {}); }) }, icon('download', 14), 'Import Characters from Other Books…') : null;
+  // Show or hide the marks on character names in the text (a light tint and a dot).
+  let marksBtn = null;
+  if (ctx.marks) {
+    const box = h('input', { type: 'checkbox', role: 'switch', class: 'switch', checked: !!ctx.marks.get() });
+    box.addEventListener('change', () => ctx.marks.set(box.checked));
+    marksBtn = h('label', { class: 'ch-marks', title: 'Light green stripes on your characters’ names in the text. Point at a name to open them.' }, box, h('span', {}, 'Mark names in editor'));
+  }
+  const close = sheet('Characters', body, { full: true, actions: h('span', { class: 'ch-actions' }, marksBtn, importBtn), onClose: () => ctx.onClose?.() });
   ctx.close = close;
   return { refresh() { recount(); drawList(); drawDetail(); } };
 }

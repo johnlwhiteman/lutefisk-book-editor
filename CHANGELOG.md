@@ -6,6 +6,25 @@ All notable changes to Lutefisk Book Editor are listed here, newest first. The f
 
 ### Changed
 
+- In Research, the notes pane is called **README.md** (the file it is).
+- The icons above the editor (Characters, Comments, Spelling, Grammar, Tools, Random Thoughts) show just their name when you point at them. The character card no longer has Hide marks.
+- The binder follows the skin you choose — its colors, surfaces and accent, by day and night — instead of a fixed warm tint.
+- Binder sections no longer have outlines: each sits on the page with a faint lift (Stronger and Strongest contrast keep a clear edge).
+- A simpler Characters window: no counts beside names (in the list or on the Characters button); Appears in is just the chapter numbers they're in (click one to go there); Also known as is the only matching setting (first names are always matched); new characters start with Age and Occupation only — empty Appearance, Personality, Goal and Motivation are dropped; “Import Characters from Other Books…”; no How It Works button.
+- The binder is quieter: Front Matter, Body and Back Matter are just their names, with no icons or counts (click one to fold it), there's no “Auto” after Title Page and Contents, and the covers say nothing unless one is Not set.
+- The right-click menu starts with **Add Card, Add Character, Add Comment and Add Random Thought**, always at the top and in that order (each starts from the selected text, if any). Add Character with nothing selected makes a new, empty character.
+- Front and back matter can be put in any order: drag a row in the binder (or right-click › Move Up / Move Down). Each part keeps its own pages — front matter stays before the chapters, back matter after — and the e-book, print and exports follow your order.
+- A warmer binder: a hint of paper in the background, softer cards, part names in plain words with a small picture each, and the book's title in a book face beside a slightly tilted cover. Audit turns green when there's nothing to fix.
+- Panels (the title-bar button, and right-clicking the top of a pane) shows the six arrangements as little pictures instead of a list of words.
+- Help is shorter: eight brief topics covering the main features, and a seven-step tour.
+- No logline; the description says what the book is about. New Book asks for an optional description, and an existing logline becomes the book's description if it doesn't have one.
+- The top of the binder: the book's title across the top, and beside the cover two rows — Goals and Insights, then Research and Audit. Goals' percentages are in its tooltip.
+- The Recycle Bin moved from the bottom of the binder to the title bar, just right of Settings; point at it to see how much is in it.
+- The day/night button in the title bar now steps through Day → Night → System → Day (System follows your computer).
+- In the Library, Settings sits just right of the app's name, as it sits right of the fish in a book window.
+- Settings (the gear) now sits just right of the fish at the left of the title bar.
+- The preview's template control matches the device and reading-theme pickers: one button with ↕ in it (↑ ↓ still step through the designs), and the gear beside it — no more arrows on either side. The device, template and theme names are all bold.
+
 - The e-book preview's text-size slider now goes up to 200% (from 50%), like the largest type settings on real readers.
 - Settings opens as a panel at the right, with the app undimmed beside it, so changes to the skin, text size or contrast show as you make them.
 - Spelling dialects: American, British, Canadian and Australian English (Indian English is no longer offered; if you used it, you're switched to American).
@@ -19,18 +38,39 @@ All notable changes to Lutefisk Book Editor are listed here, newest first. The f
 
 ### Added
 
+- **Rename in the binder:** double-click any name — a chapter, a scene, or a front or back matter page such as Dedication or Contents — type the new name, and press Return (Esc leaves it as it was; clearing it brings back the usual name).
+- **Audit › Open comments:** every open comment, with what it says, the text it's on, the chapter and who wrote it — Go to It, or **Close** it (asks first). **Close All…** closes them all, after asking.
+- Three plain, whitish skins with no artwork: **Paper** (warm white), **Porcelain** (cool white with slate blue) and **Linen** (soft gray-white with sage), each with a night version.
+- **Character marks, on or off.** The Characters window has a “Mark names in editor” switch at the top: light green stripes and a small green dot after each name, the same for every character.
+- **Audit › Characters:** a character whose name never appears in the text, and names that keep coming up in the text but aren't in Characters (as a suggestion), each with a button to open Characters.
+- **Random Thoughts remember where.** The right-click box can keep where you were and the text you'd highlighted (two checkboxes, both on). The highlighted text shows above the thought, and the place is a button that takes you back there.
+- **Random Thoughts.** Jot down anything — an idea, a line, a what-if. Right-click in your text › Add Random Thought for a small box right where you are (Return saves, Esc cancels; selected text starts it off). The thought bubble right of Tools, and Random Thoughts in Research, list them all: add one at the top, click any to edit it, or delete it (it goes to the Recycle Bin). Kept with the book, never in it.
+- **Cancel** in the index card window: a new card isn't kept, and an existing one goes back to how it was. A new card closed with nothing written in it isn't kept either.
+- **CITATION.cff**, so GitHub shows “Cite this repository” with APA and BibTeX.
+- **Book Audit.** **Audit** in the binder, beside Research (or View › Audit Book…), reads the whole book for things that could be wrong before it goes out: a missing title, author, description or publication year; an invalid ISBN; no front cover image or no back cover; a missing or empty copyright page, or one whose line has no author; starter text left in About the Author, Acknowledgments and the like; untitled, duplicate or empty chapters and empty scenes; TK, TODO and ??? notes to self; images without descriptions; open comments; and possible spelling and grammar problems in every chapter. Findings are grouped and ranked (problems, things to check, suggestions), each with a button that goes where it can be fixed, and **Ignore** for anything that's fine as it is (ignored findings are kept with the book and can be restored). Tabs show To Fix, Ignored and Passed; To Fix lists real issues and suggestions together, each tagged Problem, Check or Suggestion. In the binder, Audit turns red when something needs fixing; point at it for the count — the same number as To Fix, spelling and grammar included. Nothing is changed by the audit itself.
+- **Character names highlighted in the editor.** Every name, alias and first name of your characters is faintly tinted in that character's color. Point at one for a card with their role and a few attributes; click the name (or Open Character) to open them in Characters — close it and you're back exactly where you were. Right-click the Characters button to turn the tint off or on.
+- **Front Cover and Back Cover in the binder**, before Front Matter and after Back Matter. Each shows what the cover is made of (Image, Generated, Description or Not set); clicking one shows it in the preview and opens Book › Covers at it.
+- **High contrast**, one switch in Settings › Vision & Comfort. It lays a stronger High Contrast look — full-strength text, solid lines, outlined controls, heavier icons and a bold focus ring — over any skin; off brings your own back.
 - **Your dictionary** (Settings › Spelling & Grammar › Edit Dictionary…): add, find, correct and remove the words you've added. Removing a word now takes effect at once.
 - **Spelling & grammar rules** (Settings › Spelling & Grammar › Choose Rules…): Harper's rules in their 16 groups, with descriptions; turn a whole group or single rules on or off, pick a side on choices like the Oxford comma, find a rule, see the ones you've changed, and restore the defaults.
 - **Text size** in Settings › Vision & Comfort and **View › Text Size**: Default, Large (125%), Larger (150%), Largest (175%) and Extra Large (200%) for the whole window.
-- **Contrast** in Settings › Vision & Comfort and **View › Contrast**, for every skin: Softer, Standard, Stronger and Strongest. It replaces the "Stronger contrast" checkbox (if you had it on, you're on Stronger).
+- **Contrast** in Settings › Vision & Comfort, for every skin: Softer, Standard, Stronger and Strongest. It replaces the "Stronger contrast" checkbox (if you had it on, you're on Stronger).
 - **View › Skin** and **View › Appearance** in the application menu: switch skins, and between Day, Night and System, without opening Settings.
 - Each new book gets its own cover color in the Library, different from the books already there.
 - Uploading a front or back cover shows it first, with its size, and asks whether to use it.
-- New Book asks for a logline: what the book is about, in one or two sentences, in a box three lines tall (also in Book settings). There's no word count; the note under it only speaks up past two sentences.
 - A picture or drawing you delete from the text is removed from the book's `assets` folder (moved to the Trash) when you close the book or next open it.
 
 ### Fixed
 
+- Skin artwork no longer disappears with Stronger or Strongest contrast (only High contrast leaves it off), and no other background in the app can cover it.
+- Skin artwork was drawn so faintly it could hardly be seen, and the binder's cards covered it; it's now clearly visible on the title bar, the binder (through its cards), the Library and the preview. Settings › Appearance › **Skins** (was Skin) notes that Strongest contrast and High contrast leave the artwork off.
+- Characters › Appears in showed “null” for a chapter left out of the book; it now shows a dash.
+- A stray line in the stylesheet stopped the number on the Characters button from being placed correctly.
+- Turning writing goals off now hides them in the Library straight away, too.
+- Pointing at a character's name no longer darkens it; the highlight stays light and the text stays readable.
+- Contrast (Softer, Stronger, Strongest) now works with every skin; before, it only changed Classic.
+- The stopwatch starts from zero each time the app starts, instead of carrying on from earlier in the day.
+- View › Contrast is gone from the menu; contrast is set in Settings › Vision & Comfort.
 - Menus no longer show two dividers in a row (for example after Paste in the right-click menu), and every divider is the same thickness.
 
 ## [1.0.0] - 2026-11-18

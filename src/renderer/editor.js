@@ -23,6 +23,7 @@ import { openSymbolPicker } from './symbol-picker.js';
 import { CASES, changeCase } from '../shared/textcase.js';
 import { typoEdits } from '../shared/typography.js';
 import { linkInfo, describeWhen, normalizeUrl, displayUrl, looksLikeUrl } from '../shared/linkinfo.js';
+import { mentionRegex } from '../shared/characters.js';
 
 
 /* ------------------------------------------------------------------ schema */
@@ -737,6 +738,57 @@ const currentBlock = new Plugin({
   },
 });
 
+/**
+ * Character names, faintly tinted in each character's color. Found the same way as
+ * Characters › Appears in (whole words, same capitals, aliases and first names).
+ * Code is skipped. Point at a name for a card that opens that character.
+ */
+export const charKey = new PluginKey('lutefisk-characters');
+function findCharacters(doc, chars) {
+  const finders = (chars || []).map((c) => ({ c, re: mentionRegex(c) })).filter((x) => x.re);
+  if (!finders.length) return DecorationSet.empty;
+  const decos = [];
+  doc.descendants((node, pos) => {
+    if (node.type === schema.nodes.code_block) return false;
+    if (!node.isTextblock) return true;
+    // The block's text, one character per position (anything not plain text is a placeholder).
+    let text = '';
+    node.forEach((child) => { text += child.isText && !child.marks.some((m) => m.type.name === 'code') ? child.text : '\ufffc'.repeat(child.nodeSize); });
+    if (!text.trim()) return false;
+    const taken = [];
+    for (const { c, re } of finders) {
+      re.lastIndex = 0;
+      for (let m; (m = re.exec(text));) {
+        const from = pos + 1 + m.index, to = from + m[0].length;
+        // Two characters can share a name (a first name): the earlier one in the list keeps it.
+        if (taken.some(([a, b]) => from < b && to > a)) continue;
+        taken.push([from, to]);
+        const col = /^#[0-9a-f]{3,8}$/i.test(c.color || '') ? c.color : 'var(--accent)';
+        decos.push(Decoration.inline(from, to, { class: 'pm-char', 'data-char': c.id, style: `--char: ${col}` }));
+      }
+    }
+    return false;
+  });
+  return DecorationSet.create(doc, decos);
+}
+function characterPlugin(getChars) {
+  // Found again only when the text changes or the cast does (bump()), and kept otherwise.
+  const cache = { doc: null, v: -1, deco: DecorationSet.empty };
+  let version = 0;
+  const plugin = new Plugin({
+    key: charKey,
+    props: {
+      decorations(state) {
+        if (!getChars) return null;
+        if (cache.doc !== state.doc || cache.v !== version) Object.assign(cache, { doc: state.doc, v: version, deco: findCharacters(state.doc, getChars()) });
+        return cache.deco;
+      },
+    },
+  });
+  plugin.bump = () => { version++; };
+  return plugin;
+}
+
 /** The same token colors as the book, inside the editor's code blocks. */
 let codeStyled = false;
 function styleCodeBlocks() {
@@ -808,7 +860,8 @@ export function createEditor(mount, ctx) {
   // Spelling and grammar (Harper, on this computer). The browser's own checker is
   // switched off while it runs, so words aren't underlined twice.
   const spell = ctx.spell || { enabled: () => false, dialect: () => 'american', kinds: () => new Set() };
-  const plugins = [tableEditing(), tableKeys, codeKeys, codeHighlight, buildInputRules(), keymap(keys), keymap(baseKeymap), dropCursor(), gapCursor(), history(), currentBlock, searchPlugin, harperPlugin(spell)];
+  const charPlugin = characterPlugin(ctx.characters);
+  const plugins = [tableEditing(), tableKeys, codeKeys, codeHighlight, buildInputRules(), keymap(keys), keymap(baseKeymap), dropCursor(), gapCursor(), history(), currentBlock, searchPlugin, charPlugin, harperPlugin(spell)];
   const mkState = (doc) => EditorState.create({ doc, plugins });
   const spellKeyName = plugins.at(-1).spec.key;
 
@@ -836,9 +889,13 @@ export function createEditor(mount, ctx) {
       },
       paste: (_v, e) => { if ([...(e.clipboardData?.items || [])].some((i) => i.kind === 'file')) { e.preventDefault(); return true; } return false; },
       contextmenu: (_v, e) => { hideLinkTip(); e.preventDefault(); contextMenu(e); return true; },
-      mouseover: (_v, e) => { const a = e.target.closest?.('a[href]'); if (a) showLinkTip(a); else if (linkTipFor) hideLinkTip(); return false; },
-      mouseleave: () => { hideLinkTip(); return false; },
-      keydown: () => { hideLinkTip(); return false; },
+      mouseover: (_v, e) => {
+        const a = e.target.closest?.('a[href]'); if (a) showLinkTip(a); else if (linkTipFor) hideLinkTip();
+        const nm = !a && e.target.closest?.('.pm-char'); if (nm) showCharCard(nm); else if (charFor) hideCharCardSoon();
+        return false;
+      },
+      mouseleave: () => { hideLinkTip(); hideCharCardSoon(); return false; },
+      keydown: () => { hideLinkTip(); hideCharCard(); return false; },
       mousedown: (_v, e) => {
         const a = e.button === 0 && (e.metaKey || e.ctrlKey) ? e.target.closest?.('a[href]') : null;
         if (!a) return false;
@@ -1076,6 +1133,45 @@ export function createEditor(mount, ctx) {
       linkTip.classList.add('in');
     }, 300);
   }
+  /* ---- character card: point at a highlighted name; click the name to open that character */
+  let charCard = null, charTimer = 0, charHide = 0, charFor = null;
+  function hideCharCard() { clearTimeout(charTimer); clearTimeout(charHide); charCard?.remove(); charCard = null; charFor = null; }
+  function hideCharCardSoon() { clearTimeout(charTimer); clearTimeout(charHide); if (charCard) charHide = setTimeout(hideCharCard, 260); else charFor = null; }
+  function showCharCard(el) {
+    clearTimeout(charHide);
+    if (charFor === el && charCard) return;
+    const id = el.dataset.char;
+    if (charCard && charCard.dataset.char === id) { charFor = el; return; } // the same character, a word along
+    hideCharCard();
+    charFor = el;
+    charTimer = setTimeout(() => {
+      if (!el.isConnected || charFor !== el) return;
+      const c = (ctx.characters?.() || []).find((x) => x.id === id);
+      if (!c) return;
+      const open = () => { hideCharCard(); ctx.openCharacter?.(c.id); };
+      const attrs = (Array.isArray(c.attrs) ? c.attrs : []).filter((a) => a?.k && String(a.v || '').trim()).slice(0, 2);
+      charCard = h('div', { class: 'char-card', role: 'dialog', 'aria-label': `Character: ${c.name}`, 'data-char': id, style: { '--char': c.color || 'var(--accent)' },
+        onmouseenter: () => clearTimeout(charHide), onmouseleave: () => hideCharCardSoon(), onmousedown: (e) => e.preventDefault() },
+      h('div', { class: 'cc-top' },
+        ctx.characterAvatar?.(c, 30) || h('span', { class: 'cc-dot' }),
+        h('div', { class: 'cc-id' },
+          h('button', { type: 'button', class: 'cc-name', title: `Open ${c.name} in Characters — your place in the text stays put`, onclick: open }, c.name || 'Unnamed'),
+          c.role ? h('small', {}, c.role) : null)),
+      attrs.length ? h('dl', { class: 'cc-attrs' }, attrs.flatMap((a) => [h('dt', {}, a.k), h('dd', {}, String(a.v).slice(0, 80))])) : null,
+      h('div', { class: 'cc-foot' },
+        h('button', { type: 'button', class: 'cc-open', onclick: open }, icon('people', 13), 'Open Character')));
+      document.body.append(charCard);
+      const r = el.getBoundingClientRect(), t = charCard.getBoundingClientRect();
+      let top = r.bottom + 6;
+      if (top + t.height > window.innerHeight - 6) top = r.top - t.height - 6;
+      charCard.style.left = `${Math.max(6, Math.min(window.innerWidth - t.width - 6, r.left))}px`;
+      charCard.style.top = `${top}px`;
+      requestAnimationFrame(() => charCard?.classList.add('in'));
+    }, 350);
+  }
+  view.dom.addEventListener('scroll', hideCharCard, { passive: true });
+  area.addEventListener('scroll', hideCharCard, { passive: true });
+
   const modHeld = (e) => view?.dom?.classList.toggle('mod-held', IS_MAC ? e.metaKey : e.ctrlKey);
   window.addEventListener('keydown', modHeld);
   window.addEventListener('keyup', modHeld);
@@ -1400,10 +1496,13 @@ export function createEditor(mount, ctx) {
     const inCode = codeAt >= 0;
     const link = !inCode ? linkItems(at) : [];
     const onLink = link.length > 1;
-    // At the top: New Comment (or Delete Comment inside one), then New Index Card.
+    // At the top, always in this order: Add Card, Add Character, Add Comment (Delete Comment inside one),
+    // Add Random Thought. With text selected, each starts from it.
     const cardTop = [
-      { label: cid ? 'Delete Comment' : 'New Comment', icon: cid ? 'trash' : 'comment', hint: cid ? '' : '⌃⌥M', onClick: cid ? () => { removeComment(cid); ctx.deleteComment?.(cid); } : commentCmd },
-      ...(inCode || !ctx.makeCard ? [] : [{ label: 'New Index Card', icon: 'card', hint: hasSel ? 'from selection' : '', onClick: () => ctx.makeCard(hasSel ? selectionMarkdown() : '', selText) }]),
+      ...(inCode || !ctx.makeCard ? [] : [{ label: 'Add Card', icon: 'card', hint: hasSel ? 'from selection' : '', onClick: () => ctx.makeCard(hasSel ? selectionMarkdown() : '', selText) }]),
+      ...(inCode || !ctx.addAsCharacter ? [] : [{ label: 'Add Character', icon: 'person', hint: hasSel ? 'from selection' : '', onClick: () => ctx.addAsCharacter(selText || '') }]),
+      { label: cid ? 'Delete Comment' : 'Add Comment', icon: cid ? 'trash' : 'comment', hint: cid ? '' : '⌃⌥M', onClick: cid ? () => { removeComment(cid); ctx.deleteComment?.(cid); } : commentCmd },
+      ...(!ctx.newThought ? [] : [{ label: 'Add Random Thought', icon: 'thought', hint: hasSel ? 'from selection' : '', onClick: () => ctx.newThought(hasSel ? selText : '') }]),
       '-',
     ];
     const items = [
@@ -1417,7 +1516,6 @@ export function createEditor(mount, ctx) {
       // The selection (or the link under the pointer)
       ...(onLink ? [{ label: 'Link', icon: 'link', submenu: link, subWidth: 200 }] : link),
       ...(hasSel && !inCode ? [{ label: 'Change Case', icon: 'textSize', submenu: CASES.map((c) => ({ label: c.label, onClick: () => caseCmd(c.id) })), subWidth: 200 }] : []),
-      ...(selText && ctx.addAsCharacter ? [{ label: 'Add as Character', icon: 'person', onClick: () => ctx.addAsCharacter(selText) }] : []),
       ...(inCode ? [] : [
         '-',
         // Exactly the toolbar's + menu: the same items in the same order.
@@ -1873,6 +1971,8 @@ export function createEditor(mount, ctx) {
     selectionText() { const { from, to } = view.state.selection; return view.state.doc.textBetween(from, to, ' '); },
     hasSelection() { return !view.state.selection.empty; },
     forget(id) { states.delete(id); },
+    /** The cast changed (or highlights went on or off): find the names again in the open text. */
+    refreshCharacters() { hideCharCard(); charPlugin.bump(); view.setProps({}); },
     /** Redraw citation chips (style or sources changed). */
     refreshCitations() { view.setProps({ nodeViews: { ...view.props.nodeViews } }); },
     reset() { states.clear(); currentId = null; },

@@ -42,6 +42,9 @@ export function ensureGoalDefaults(book, startedAt) {
   return true;
 }
 
+/** Books whose stopwatch has started in this run of the app (it starts from zero once per run). */
+const OPENED_THIS_RUN = new Set();
+
 export function createGoals(app) {
   let history = { book: [], all: [] };
   let lastTotal = null;
@@ -80,15 +83,19 @@ export function createGoals(app) {
   /* ---- stopwatch: started and stopped by hand. Its time is logged per day.
      State is kept per book on this computer so it survives a restart (stopped). */
   const swKey = () => `lutefisk.stopwatch.${app.book?.uuid || 'none'}`;
-  // The stopwatch keeps each book's time for the day: open a book and it carries on from that
-  // book's time today (from zero on a new day). It starts by itself when the book opens.
+  // The stopwatch starts from zero each time the app starts, and by itself when a book opens.
+  // Within one run, going back to a book carries on from that book's time (zero on a new day).
+  // The day's writing time is still logged for goals and Insights either way.
   let sw = { acc: 0, since: 0, day: dayKey(Date.now()) };
   function swLoad() {
     const today = dayKey(Date.now());
+    const fresh = !OPENED_THIS_RUN.has(swKey());
+    OPENED_THIS_RUN.add(swKey());
     try {
-      const v = JSON.parse(localStorage.getItem(swKey()) || 'null');
+      const v = fresh ? null : JSON.parse(localStorage.getItem(swKey()) || 'null');
       sw = { acc: v?.day === today ? Number(v?.acc) || 0 : 0, since: 0, day: today };
     } catch { sw = { acc: 0, since: 0, day: today }; }
+    if (fresh) swSave();
   }
   const swSave = () => { try { localStorage.setItem(swKey(), JSON.stringify({ acc: Math.round(stopwatch().ms), day: sw.day })); } catch { /* ignore */ } };
   function swTick() {
@@ -634,7 +641,7 @@ export function stopwatchControl(app, goals, { onHistory } = {}) {
     el.classList.toggle('zero', s.ms < 1000);
     if (wasRunning !== s.running) {
       playIcon.replaceChildren(icon('stopwatch', 17));
-      toggle.title = s.running ? 'Stopwatch — this book’s writing time today. It starts when you open the book; click to pause.' : 'Stopwatch — paused. Click to carry on timing this book today.';
+      toggle.title = s.running ? 'Stopwatch — time on this book since the app started. It starts when you open the book; click to pause.' : 'Stopwatch — paused. Click to carry on timing.';
       toggle.setAttribute('aria-label', s.running ? 'Stop stopwatch' : 'Start stopwatch');
       wasRunning = s.running;
     }

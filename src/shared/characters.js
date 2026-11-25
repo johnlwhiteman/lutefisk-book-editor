@@ -4,12 +4,15 @@
 export const ROLES = ['Protagonist', 'Antagonist', 'Deuteragonist', 'Love interest', 'Mentor', 'Sidekick', 'Supporting', 'Minor'];
 
 /** Attribute fields offered for a new character (all optional; add your own). */
-export const DEFAULT_ATTRIBUTES = ['Age', 'Occupation', 'Appearance', 'Personality', 'Goal', 'Motivation', 'Fear', 'Flaw', 'Strength', 'Backstory', 'Arc'];
+// A new character starts with just these; anything else is a custom attribute.
+export const DEFAULT_ATTRIBUTES = ['Age', 'Occupation'];
+/** Attributes new characters used to start with: dropped when still empty. */
+export const RETIRED_ATTRIBUTES = ['Appearance', 'Personality', 'Goal', 'Motivation'];
 
 export const CHARACTER_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#5e5e63', '#0f8fa8'];
 
 export function newCharacter(id, name = '', i = 0) {
-  return { id, name, aliases: [], role: '', color: CHARACTER_COLORS[i % CHARACTER_COLORS.length], matchFirst: true, attrs: DEFAULT_ATTRIBUTES.slice(0, 6).map((k) => ({ k, v: '' })), notes: '' };
+  return { id, name, aliases: [], role: '', color: CHARACTER_COLORS[i % CHARACTER_COLORS.length], matchFirst: true, attrs: DEFAULT_ATTRIBUTES.map((k) => ({ k, v: '' })), notes: '' };
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -64,31 +64,6 @@ function blockLookFields(b, onChange) {
     h('small', { class: 'hint' }, 'Transparent with no padding by default. A code block’s own border is set in its bar in the editor. On e-ink screens, colors show as gray.'));
 }
 
-/** Sentences in a logline (ignoring Mr., Dr., St. and the like, and initials). */
-export const loglineSentences = (text) => {
-  const t = String(text || '').replace(/\b(Mr|Mrs|Ms|Dr|St|Sr|Jr|Prof|Capt|Lt|Gen|Col|Rev|Mt|vs|etc|e\.g|i\.e)\./gi, '$1').replace(/\b[A-Z]\./g, 'X').trim();
-  return t ? t.split(/[.!?…]+(?:["”’')\]]*)\s+(?=\S)/).filter((x) => /[\p{L}\p{N}]/u.test(x)).length : 0;
-};
-/**
- * The logline: what the book is about, in one or two sentences, in a box three lines tall.
- * No word count; the note under it only speaks up past two sentences. New Book won't go on
- * without one.
- */
-export function loglineField(b, onChange, { required = false, rows = 3 } = {}) {
-  const ta = h('textarea', { rows, class: 'll-main', placeholder: 'What’s the book about?', 'aria-label': 'Logline', 'aria-required': required ? 'true' : null });
-  ta.value = b.logline || '';
-  const meter = h('small', { class: 'll-meter' });
-  const draw = () => {
-    const sentences = loglineSentences(ta.value);
-    meter.className = `ll-meter${sentences > 2 ? ' long' : ''}`;
-    meter.textContent = sentences > 2 ? `${sentences} sentences — keep it to one or two` : 'One or two sentences.';
-  };
-  ta.addEventListener('input', () => { b.logline = ta.value; onChange(); draw(); ta.setCustomValidity(''); });
-  draw();
-  const wrap = h('label', { class: 'fld' }, h('span', {}, 'Logline'), ta, meter);
-  wrap.textarea = ta;
-  return wrap;
-}
 function field(label, input, hint) {
   return h('label', { class: 'fld' }, h('span', {}, label), input, hint ? h('small', { class: 'hint' }, hint) : null);
 }
@@ -219,7 +194,7 @@ function confirmCover(rel, label, b, key) {
   });
 }
 
-export function openBookSettings(app, initialTab = 'general') {
+export function openBookSettings(app, initialTab = 'general', { focus } = {}) {
   const b = app.book;
   const ch = () => { app.markDirty(); app.refreshAll(); };
   b.print ||= {};
@@ -228,7 +203,7 @@ export function openBookSettings(app, initialTab = 'general') {
   const pane = h('div', { class: 'tab-pane' });
 
   function coverPicker(key, label, hint) {
-    const box = h('div', { class: 'cover-slot' });
+    const box = h('div', { class: 'cover-slot', 'data-key': key });
     const opts = () => { b.coverLayout ||= {}; return (b.coverLayout[key] ||= {}); };
     const frame = h('div', { class: 'cover-frame' });
     const drawFrame = () => {
@@ -295,7 +270,6 @@ export function openBookSettings(app, initialTab = 'general') {
       field('Subtitle', titleInput(app, b, 'subtitle', ch)),
       authorsField(b, ch),
       field('Genre', genreSelect(() => b.genre, (g) => { if (g) b.genre = g; else delete b.genre; ch(); }), 'Also written into the e-book as its subject, so stores and libraries can shelve it.'),
-      loglineField(b, ch),
       field('Publisher', textInput(b, 'publisher', ch, { placeholder: 'Imprint name (optional)' })),
       h('div', { class: 'row2' }, field('Year', textInput(b, 'year', ch, { type: 'number' })),
         field('Language', select(b, 'language', [['en', 'English'], ['en-GB', 'English (UK)'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['sv', 'Swedish'], ['pl', 'Polish']], ch))),
@@ -361,6 +335,15 @@ export function openBookSettings(app, initialTab = 'general') {
     h('div', {}, h('b', {}, 'Delete this book'), h('small', { class: 'hint' }, 'Moves the whole book folder to the Trash after you confirm. You can restore it from there.')),
     h('button', { type: 'button', class: 'btn small danger', onclick: () => app.deleteOpenBook() }, icon('trash', 14), 'Delete Book…'));
   const close = sheet('Book', h('div', {}, h('div', { class: 'tab-bar' }, seg), pane, backup, del), {});
+  // Opened from the binder's Front Cover or Back Cover: bring that cover into view and mark it.
+  if (focus) requestAnimationFrame(() => {
+    const slot = pane.querySelector(`.cover-slot[data-key="${focus}"]`);
+    if (!slot) return;
+    slot.scrollIntoView({ block: 'center' });
+    slot.classList.add('flash');
+    setTimeout(() => slot.classList.remove('flash'), 1600);
+  });
+  return close;
 }
 
 function toggle(obj, key, label, hint, onChange) {

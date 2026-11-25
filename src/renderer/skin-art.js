@@ -71,18 +71,21 @@ const SKIN_ART = {
 // the Library and behind the preview.
 const PLACES = ['.titlebar', '.library', '.preview-pane'];
 const sel = (id, places) => places.map((p) => `html[data-skin="${id}"] ${p}`).join(', ');
-const BINDER = 0.55;
+const BINDER = 0.9;
+// How strong the artwork is everywhere (it was drawn so faintly it could hardly be seen).
+const STRENGTH = 1.8;
 
 /** The CSS for every skin's pattern (and the matching swatch in Settings › Appearance). */
 export function skinArtCss() {
   let out = '';
-  const rule = (id, places, pat) => `${sel(id, places)}{background-image:${pat.image};background-size:${pat.size};}`;
+  // !important: no other background rule in the app may hide the artwork (High contrast uses its own skin, which has none).
+  const rule = (id, places, pat) => `${sel(id, places)}{background-image:${pat.image} !important;background-size:${pat.size} !important;background-repeat:repeat !important;}`;
   for (const [id, { p, day, night }] of Object.entries(SKIN_ART)) {
-    const make = ([ink, a, paper, dot], k = 1) => PATTERNS[p](ink, +(a * k).toFixed(3), paper, dot);
+    const make = ([ink, a, paper, dot], k = 1) => PATTERNS[p](ink, +Math.min(0.5, a * k * STRENGTH).toFixed(3), paper, dot);
     out += rule(id, PLACES, make(day)) + rule(id, ['.sidebar'], make(day, BINDER)) + '\n';
     out += `@media (prefers-color-scheme: dark){${rule(id, PLACES, make(night))}${rule(id, ['.sidebar'], make(night, BINDER))}}\n`;
-    const sw = make(day, Math.min(3, 0.5 / day[1]));
-    const swn = make(night, Math.min(3, 0.5 / night[1]));
+    const sw = make(day, Math.min(3, 0.5 / day[1]) / STRENGTH);
+    const swn = make(night, Math.min(3, 0.5 / night[1]) / STRENGTH);
     out += `.skin-sw.tex-${id}{background-image:${sw.image};background-size:${sw.size};}\n`;
     out += `@media (prefers-color-scheme: dark){.skin-sw.tex-${id}{background-image:${swn.image};}}\n`;
   }

@@ -15,6 +15,7 @@ export const BIN_KINDS = {
   todo: { label: 'To-do', icon: 'checklist' },
   character: { label: 'Character', icon: 'people' },
   card: { label: 'Plot card', icon: 'plot' },
+  thought: { label: 'Random thought', icon: 'thought' },
 };
 
 /** Put a deleted thing in the book's Recycle Bin. texts: { id: markdown } for anything with a file. */
@@ -50,7 +51,7 @@ export function openRecycleBin(app, sheet, { restore, onChange }) {
   };
   const row = (e) => {
     const k = BIN_KINDS[e.kind] || { label: 'Item', icon: 'doc' };
-    const words = Object.values(e.texts || {}).reduce((n, t) => n + countWords(t), 0) || (e.kind === 'snippet' ? countWords(e.item?.text) : 0);
+    const words = Object.values(e.texts || {}).reduce((n, t) => n + countWords(t), 0) || (e.kind === 'snippet' || e.kind === 'thought' ? countWords(e.item?.text) : 0);
     const more = h('button', { class: 'sb-tool', title: 'More', 'aria-label': 'More', onclick: () => popover(more, [
       { label: 'Restore', icon: 'reset', onClick: () => doRestore(e) },
       { label: 'Delete Forever…', icon: 'trash', danger: true, onClick: () => doDelete(e) },

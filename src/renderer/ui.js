@@ -207,6 +207,13 @@ const ICON_PATHS = {
   slides: 'M3 4h18v12H3zM12 16v4M8 20h8M7 8h6M7 11h10',
   present: 'M3 4h18v12H3zM12 16v4M8 20h8M10 7.5l5 2.5-5 2.5z',
   checklist: 'M4 6.5l1.5 1.5L8 5.5M4 12.5l1.5 1.5L8 11.5M4 18.5l1.5 1.5L8 17.5M11 7h9M11 13h9M11 19h9',
+  // High contrast: a circle, its right half hatched in.
+  contrast: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 3v18M12 7.5h6.6M12 12h9M12 16.5h6.6',
+  // Appearance follows the computer: a small screen, half day and half night.
+  system: 'M3.5 5h17v11.5h-17zM8.5 20.5h7M12 16.5v4M12 5v11.5M12 8.5h8.5M12 12h8.5',
+  // Audit: a magnifier with a check in it.
+  audit: 'M10.5 17.5a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM15.5 15.5L20.5 20.5M7.6 10.7l2 2 3.6-3.7',
+  warn: 'M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.4v.1',
   grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
   highlighter: 'M14.5 4.5l5 5-8 8H8.5v-3zM8.5 14.5l-3 3v1.5h4l2-2M13 6l5 5',
   eraser: 'M8 20h12M5.5 14.5l8-8a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L12 18H8.5l-3-3a.4.4 0 0 1 0-.5zM9 11l5 5',

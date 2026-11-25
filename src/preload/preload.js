@@ -7,7 +7,7 @@ const call = (ch) => (...args) => ipcRenderer.invoke(ch, ...args);
 const LOOK_COMMANDS = new Set(['theme:system', 'theme:light', 'theme:dark', 'ui-zoom-changed', 'contrast:-1', 'contrast:0', 'contrast:1', 'contrast:2', 'size:1', 'size:1.25', 'size:1.5', 'size:1.75', 'size:2', ...['classic', 'batik', 'seigaiha', 'washi', 'talavera', 'mudcloth', 'kuba', 'koru', 'meander', 'selbu', 'andean', 'contrast'].map((s) => `skin:${s}`)]);
 const MENU_COMMANDS = new Set([
   'new-book', 'open-book', 'library', 'save', 'new-chapter', 'new-scene', 'split-scene', 'export-epub', 'export-pdf', 'export-docx', 'export-md', 'help', 'tour', 'export-rtf', 'export-txt', 'export-mobi', 'reveal',
-  'view-device', 'view-print', 'view-stats', 'flush-and-close', 'zoom-in', 'zoom-out', 'zoom-reset', 'toggle-sidebar', 'focus-mode', 'toggle-preview', 'toggle-comments', 'content-search', 'open-characters', 'open-plot', 'find-in-chapter', 'open-plot-board', 'open-timeline', 'spell-check', 'open-history', 'open-settings', 'backup-book', 'find-replace',
+  'view-device', 'view-print', 'view-stats', 'flush-and-close', 'zoom-in', 'zoom-out', 'zoom-reset', 'toggle-sidebar', 'focus-mode', 'toggle-preview', 'toggle-comments', 'content-search', 'open-characters', 'open-plot', 'find-in-chapter', 'open-plot-board', 'open-timeline', 'spell-check', 'open-history', 'open-settings', 'backup-book', 'find-replace', 'audit-book',
 ]);
 
 contextBridge.exposeInMainWorld('lutefisk', {

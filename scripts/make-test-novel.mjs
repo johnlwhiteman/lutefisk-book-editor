@@ -76,7 +76,6 @@ book.uuid = '0b7d2f84-5e1c-4d0a-9a77-7e3c2f1d5a90';
 book.publisher = 'Damp Biscuit Books';
 book.year = '2026';
 book.genre = 'Humor';
-book.logline = 'When a retired admiral accidentally insults the Moon, he must sail a single teaspoon across the Sea of Mild Inconvenience to apologize in person — before the tides, which are taking it very personally, refuse to come back.';
 book.description = 'An admiral, a goose, a walking lighthouse and a scone with opinions set sail in a teaspoon to say sorry to the Moon.';
 book.keywords = ['humor', 'nautical nonsense', 'the Moon', 'apologies'];
 book.template = 'classic';

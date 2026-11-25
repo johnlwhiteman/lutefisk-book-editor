@@ -1,0 +1,30 @@
+# How to cite Lutefisk Book Editor. GitHub reads this file and shows a
+# "Cite this repository" button (APA and BibTeX) on the repository page.
+# Spec: https://citation-file-format.github.io/
+cff-version: 1.2.0
+message: "If you use Lutefisk Book Editor in your work, please cite it as below."
+type: software
+title: "Lutefisk Book Editor"
+abstract: >-
+  A local-first book writing and formatting studio with live device and print
+  previews. Write, design and export books (EPUB, PDF, Word, RTF, MOBI,
+  Markdown and plain text) entirely on your own computer — no accounts, no
+  cloud, no tracking.
+authors:
+  # Add each person as: - given-names: "First"  family-names: "Last"  (orcid: "https://orcid.org/…")
+  - name: "The Lutefisk Book Editor authors"
+version: "1.0.0"
+date-released: "2026-11-18"
+license: MIT
+repository-code: "https://github.com/johnlwhiteman/lutefisk-book-editor"
+url: "https://github.com/johnlwhiteman/lutefisk-book-editor#readme"
+keywords:
+  - book editor
+  - writing
+  - self-publishing
+  - ebook
+  - epub
+  - pdf
+  - typesetting
+  - electron
+  - local-first
