@@ -1,6 +1,6 @@
 // Rich-text editor (Quill-style toolbar) built on ProseMirror. The document
 // is stored as Markdown; this module converts both ways.
-import { Schema } from 'prosemirror-model';
+import { Schema, Fragment, Slice } from 'prosemirror-model';
 import { EditorState, NodeSelection, TextSelection, Selection, Plugin, PluginKey } from 'prosemirror-state';
 import { EditorView, Decoration, DecorationSet } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
@@ -24,6 +24,9 @@ import { CASES, changeCase } from '../shared/textcase.js';
 import { typoEdits } from '../shared/typography.js';
 import { linkInfo, describeWhen, normalizeUrl, displayUrl, looksLikeUrl } from '../shared/linkinfo.js';
 import { mentionRegex } from '../shared/characters.js';
+import { MARK_GROUPS, MARKS, GUIDE_RULES, GUIDES, markType, markText, canApply, newReviewId, INKS } from '../shared/review.js';
+const INK_IDS = Object.keys(INKS);
+import { canJoin } from 'prosemirror-transform';
 
 
 /* ------------------------------------------------------------------ schema */
@@ -103,8 +106,21 @@ export const schema = new Schema({
       },
     }),
     hard_break: { inline: true, group: 'inline', selectable: false, parseDOM: [{ tag: 'br' }], toDOM: () => ['br'] },
+    /* Review mode: a proofreader's mark at a point (insert, ¶, a comma…). Editor only — never in the book. */
+    review_point: {
+      inline: true, group: 'inline', atom: true, selectable: false,
+      attrs: { id: {}, type: { default: 'ins' } },
+      parseDOM: [{ tag: 'span.pm-rv-pt', getAttrs: (d) => ({ id: d.dataset.review, type: d.dataset.type || 'ins' }) }],
+      toDOM: (n) => ['span', { class: 'pm-rv-pt', 'data-review': n.attrs.id, 'data-type': n.attrs.type, contenteditable: 'false' }],
+    },
   },
   marks: {
+    /* Review mode: a proofreader's mark on a stretch of text. Editor only — the text exports as written. */
+    review: {
+      attrs: { id: {}, type: { default: 'query' } }, inclusive: false,
+      parseDOM: [{ tag: 'span.pm-rv', getAttrs: (d) => ({ id: d.dataset.review, type: d.dataset.type || 'query' }) }],
+      toDOM: (m) => ['span', { class: 'pm-rv', 'data-review': m.attrs.id, 'data-type': m.attrs.type, 'data-apply': markType(m.attrs.type).apply || 'none' }, 0],
+    },
     comment: {
       attrs: { id: {} }, inclusive: false,
       parseDOM: [{ tag: 'span[data-comment]', getAttrs: (d) => ({ id: d.getAttribute('data-comment') }) }],
@@ -174,6 +190,8 @@ const parser = new MarkdownParser(schema, tokenizer, {
   th: { block: 'table_header', getAttrs: (tok) => ({ align: cellAlign(tok) }) },
   td: { block: 'table_cell', getAttrs: (tok) => ({ align: cellAlign(tok) }) },
   comment: { mark: 'comment', getAttrs: (tok) => ({ id: tok.meta.id }) },
+  review: { mark: 'review', getAttrs: (tok) => ({ id: tok.meta.id, type: tok.meta.type }) },
+  review_point: { node: 'review_point', getAttrs: (tok) => ({ id: tok.meta.id, type: tok.meta.type }) },
   em: { mark: 'em' },
   strong: { mark: 'strong' },
   s: { mark: 'strike' },
@@ -263,6 +281,7 @@ const serializer = new MarkdownSerializer({
     state.write(':::');
     state.closeBlock(node);
   },
+  review_point(state, node) { state.write(`{%${node.attrs.id}:${node.attrs.type}%}`); },
   footnote(state, node) {
     notesOut.push(String(node.attrs.text || '').replace(/\s*\n\s*/g, ' ').trim());
     state.write(`[^${notesOut.length}]`);
@@ -276,6 +295,8 @@ const serializer = new MarkdownSerializer({
   textColor: { open: '[', close: (_s, m) => `]{color=${m.attrs.color}}`, mixable: false, expelEnclosingWhitespace: true },
   highlight: { open: (_s, m) => (m.attrs.color === 'yellow' && m.attrs.size === 'full' ? '==' : `=={${m.attrs.color},${m.attrs.size}}`), close: '==', mixable: true, expelEnclosingWhitespace: true },
   comment: { open: '{==', close: (_state, mark) => `==}{>>#${mark.attrs.id}<<}`, mixable: false, expelEnclosingWhitespace: true },
+  // Whitespace stays inside: closing up or deleting a space marks only the space.
+  review: { open: '{%%', close: (_state, mark) => `%%}{%${mark.attrs.id}:${mark.attrs.type}%}`, mixable: false },
 }, { escapeExtraCharacters: /[$^~]|\+(?=\+)/g });
 
 export function docToMarkdown(doc) {
@@ -519,6 +540,8 @@ function buildInputRules() {
   rules.push(wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list));
   rules.push(textblockTypeInputRule(/^(#{1,3})\s$/, schema.nodes.heading, (m) => ({ level: Math.max(2, m[1].length) })));
   rules.push(textblockTypeInputRule(/^```([\w+#.-]*)\s$/, schema.nodes.code_block, (m) => ({ params: normalizeLang(m[1]) || '' })));
+  // [ ] or [x] and a space at the start of a line: a checkbox.
+  rules.push(new InputRule(/^\[( |x|X)\]\s$/, (state, m, start, end) => state.tr.insertText(`${m[1] === ' ' ? BOX_OFF : BOX_ON} `, start, end)));
   rules.push(new InputRule(/^(?:\*\s?\*\s?\*|---|___)$/, (state, _m, start, end) => {
     const $s = state.doc.resolve(start);
     if ($s.parent.type !== schema.nodes.paragraph || $s.parent.textContent.length > 3) return null;
@@ -725,6 +748,30 @@ const searchPlugin = new Plugin({
   props: { decorations(state) { return searchKey.getState(state).deco; } },
 });
 
+/* ---- checkboxes: ☐ and ☑ in the text. Saved as those characters, so every export shows a box;
+   the editor draws each as a checkbox you click to check or uncheck. */
+export const BOX_OFF = '\u2610', BOX_ON = '\u2611';
+const BOX_RE = /[\u2610\u2611]/g;
+const checkboxPlugin = new Plugin({
+  state: {
+    init: (_c, state) => boxDecos(state.doc),
+    apply: (tr, old) => (tr.docChanged ? boxDecos(tr.doc) : old),
+  },
+  props: { decorations(state) { return this.getState(state); } },
+});
+function boxDecos(doc) {
+  const decos = [];
+  doc.descendants((n, pos) => {
+    if (!n.isText || !n.text.includes(BOX_OFF) && !n.text.includes(BOX_ON)) return;
+    if (n.marks.some((m) => m.type.name === 'code')) return;
+    for (const m of n.text.matchAll(BOX_RE)) {
+      const on = m[0] === BOX_ON;
+      decos.push(Decoration.inline(pos + m.index, pos + m.index + 1, { class: `pm-check${on ? ' on' : ''}`, role: 'checkbox', 'aria-checked': String(on), title: on ? 'Checked — click to uncheck' : 'Click to check' }));
+    }
+  });
+  return DecorationSet.create(doc, decos);
+}
+
 const currentBlock = new Plugin({
   props: {
     decorations(state) {
@@ -797,6 +844,114 @@ function styleCodeBlocks() {
   document.head.append(h('style', { id: 'lutefisk-code-colors' }, CODE_CSS('.pm-code')));
 }
 
+/* ------------------------------------------------- review: proofreader's marks */
+
+/** Every proofreader's mark in a document, in order: { id, type, from, to, point }. */
+export function reviewRangesIn(doc) {
+  const map = new Map();
+  doc.descendants((n, pos) => {
+    if (n.type === schema.nodes.review_point) { if (!map.has(n.attrs.id)) map.set(n.attrs.id, { id: n.attrs.id, type: n.attrs.type, from: pos, to: pos + 1, point: true }); return; }
+    if (!n.isInline) return;
+    for (const m of n.marks) if (m.type === schema.marks.review) {
+      const r = map.get(m.attrs.id);
+      if (r) { r.from = Math.min(r.from, pos); r.to = Math.max(r.to, pos + n.nodeSize); } else map.set(m.attrs.id, { id: m.attrs.id, type: m.attrs.type, from: pos, to: pos + n.nodeSize, point: false });
+    }
+  });
+  return [...map.values()].sort((a, b) => a.from - b.from);
+}
+/** The mark at a position: a point mark beside it, or marked text it touches. */
+function reviewAtPos(doc, pos) {
+  let $p;
+  try { $p = doc.resolve(pos); } catch { return null; }
+  for (const n of [$p.nodeAfter, $p.nodeBefore]) {
+    if (!n) continue;
+    if (n.type === schema.nodes.review_point) return n.attrs.id;
+    const m = n.marks.find((x) => x.type === schema.marks.review);
+    if (m) return m.attrs.id;
+  }
+  return null;
+}
+function reviewAtState(state) {
+  const { from, to } = state.selection;
+  if (from === to) return reviewAtPos(state.doc, from);
+  let id = null;
+  state.doc.nodesBetween(from, to, (n) => {
+    if (id) return false;
+    if (n.type === schema.nodes.review_point) id = n.attrs.id;
+    else id = n.marks.find((x) => x.type === schema.marks.review)?.attrs.id || null;
+    return !id;
+  });
+  return id;
+}
+/** Remove one mark (its marked text stays as it is; a point mark goes). */
+function removeReviewTr(tr, id) {
+  const pts = [];
+  tr.doc.descendants((n, pos) => {
+    if (n.type === schema.nodes.review_point && n.attrs.id === id) pts.push(pos);
+    else if (n.isInline) { const m = n.marks.find((x) => x.type === schema.marks.review && x.attrs.id === id); if (m) tr.removeMark(pos, pos + n.nodeSize, m); }
+  });
+  for (const pos of pts.reverse()) tr.delete(pos, pos + 1);
+  return tr;
+}
+/** Pasted text never brings proofreader's marks with it (they'd be copies of marks already made). */
+function dropReview(fragment) {
+  const out = [];
+  fragment.forEach((n) => {
+    if (n.type === schema.nodes.review_point) return;
+    if (n.isText) { out.push(n.mark(n.marks.filter((m) => m.type !== schema.marks.review))); return; }
+    out.push(n.copy(dropReview(n.content)));
+  });
+  return Fragment.fromArray(out);
+}
+const visibleText = (t) => (/^\s+$/.test(t) ? t.replace(/ /g, '␣').replace(/ /g, '⍽') : t);
+
+/**
+ * Review mode's look in the text: each mark gets its margin abbreviation as a little tag
+ * (“del”, “cap”, “‸ the”…), and the mark at the cursor is outlined. Nothing when Review is off.
+ * ctx.review: { on(), info(id) → { text, note, author } , guide(), select(id) }.
+ */
+const reviewKey = new PluginKey('review');
+function reviewPlugin(ctx) {
+  const build = (state) => {
+    const R = ctx.review;
+    if (!R?.on?.()) return DecorationSet.empty;
+    const active = reviewAtState(state);
+    const decos = [];
+    for (const r of reviewRangesIn(state.doc)) {
+      const def = markType(r.type);
+      const rec = R.info?.(r.id) || {};
+      const text = ['insert', 'replace'].includes(def.apply) && rec.text != null && rec.text !== '' ? rec.text : '';
+      // Written by hand: ^ for the caret, then what to insert or use.
+      const shortText = text.length > 24 ? `${text.slice(0, 23)}…` : text;
+      const label = `${def.abbr.replace(/‸/g, '^')}${shortText ? ` ${visibleText(shortText)}` : ''}`;
+      const on = r.id === active;
+      // Each mark keeps the ink it was made with (red unless chosen otherwise).
+      const ink = INK_IDS.includes(rec.ink) ? rec.ink : 'red';
+      decos.push(Decoration.widget(r.to, () => {
+        const el = document.createElement('span');
+        el.className = `rv-badge rv-ink-${ink} rv-${def.group || 'rule'}${on ? ' active' : ''}`;
+        el.dataset.review = r.id;
+        el.textContent = label;
+        el.title = `${def.label.replace('…', '')}${rec.note ? ` — ${rec.note}` : ''}${rec.author ? `\n${rec.author}` : ''}`;
+        el.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); R.select?.(r.id); });
+        return el;
+      }, { side: 1, key: `rv|${r.id}|${label}|${ink}|${on ? 1 : 0}`, ignoreSelection: true, marks: [] }));
+      // The hand-drawn stroke over the text (or the caret), in the mark's ink.
+      if (r.point) decos.push(Decoration.node(r.from, r.to, { class: `rv-ink-${ink}` }));
+      else decos.push(Decoration.inline(r.from, r.to, { class: `rv-mk rv-ink-${ink}${on ? ' rv-active' : ''}`, 'data-apply': def.apply || 'none', 'data-type': r.type }));
+    }
+    return DecorationSet.create(state.doc, decos);
+  };
+  return new Plugin({
+    key: reviewKey,
+    state: {
+      init: (_c, state) => build(state),
+      apply: (tr, old, _o, state) => (tr.docChanged || tr.selectionSet || tr.getMeta(reviewKey) ? build(state) : old),
+    },
+    props: { decorations: (state) => reviewKey.getState(state) },
+  });
+}
+
 export function createEditor(mount, ctx) {
   styleCodeBlocks();
   const toolbar = h('div', { class: 'ql-toolbar', role: 'toolbar', 'aria-label': 'Formatting' });
@@ -861,7 +1016,7 @@ export function createEditor(mount, ctx) {
   // switched off while it runs, so words aren't underlined twice.
   const spell = ctx.spell || { enabled: () => false, dialect: () => 'american', kinds: () => new Set() };
   const charPlugin = characterPlugin(ctx.characters);
-  const plugins = [tableEditing(), tableKeys, codeKeys, codeHighlight, buildInputRules(), keymap(keys), keymap(baseKeymap), dropCursor(), gapCursor(), history(), currentBlock, searchPlugin, charPlugin, harperPlugin(spell)];
+  const plugins = [tableEditing(), tableKeys, codeKeys, codeHighlight, buildInputRules(), keymap(keys), keymap(baseKeymap), dropCursor(), gapCursor(), history(), currentBlock, searchPlugin, charPlugin, checkboxPlugin, reviewPlugin(ctx), harperPlugin(spell)];
   const mkState = (doc) => EditorState.create({ doc, plugins });
   const spellKeyName = plugins.at(-1).spec.key;
 
@@ -897,6 +1052,15 @@ export function createEditor(mount, ctx) {
       mouseleave: () => { hideLinkTip(); hideCharCardSoon(); return false; },
       keydown: () => { hideLinkTip(); hideCharCard(); return false; },
       mousedown: (_v, e) => {
+        // A checkbox: click to check or uncheck it (one undo step).
+        const box = e.button === 0 ? e.target.closest?.('.pm-check') : null;
+        if (box) {
+          e.preventDefault();
+          let pos;
+          try { pos = view.posAtDOM(box, 0); } catch { return false; }
+          toggleBox(pos);
+          return true;
+        }
         const a = e.button === 0 && (e.metaKey || e.ctrlKey) ? e.target.closest?.('a[href]') : null;
         if (!a) return false;
         e.preventDefault(); hideLinkTip(); openLink(a.getAttribute('href'));
@@ -904,6 +1068,7 @@ export function createEditor(mount, ctx) {
       },
     },
     transformPastedHTML: (html) => html.replace(/<img[^>]*>/gi, ''),
+    transformPasted: (slice) => new Slice(dropReview(slice.content), slice.openStart, slice.openEnd),
   });
 
   /* ---- toolbar */
@@ -1327,6 +1492,287 @@ export function createEditor(mount, ctx) {
     view.focus();
   }
 
+  /* ---- checkboxes */
+  function toggleBox(pos) {
+    const ch = view.state.doc.textBetween(pos, pos + 1);
+    if (ch !== BOX_OFF && ch !== BOX_ON) return false;
+    const node = view.state.doc.nodeAt(pos);
+    view.dispatch(view.state.tr.replaceWith(pos, pos + 1, schema.text(ch === BOX_ON ? BOX_OFF : BOX_ON, node?.marks || [])));
+    return true;
+  }
+  /** Insert a checkbox at the cursor, with a space after it (and before it, mid-line). */
+  function insertBox() {
+    const { $from, from, to } = view.state.selection;
+    if ($from.parent.type === schema.nodes.code_block) { toast('Checkboxes can’t go in code', 'info'); return; }
+    const before = $from.parentOffset ? view.state.doc.textBetween(from - 1, from) : '';
+    const text = `${before && !/\s/.test(before) ? ' ' : ''}${BOX_OFF} `;
+    view.dispatch(view.state.tr.insertText(text, from, to).scrollIntoView());
+    view.focus();
+  }
+
+  /* ---- review: proofreader's marks (Review mode) */
+  const reviewType = schema.marks.review;
+  const R = () => ctx.review || null;
+  const clipQ = (t, n = 40) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
+  /** Make a mark of this type on the selection (or the word at the cursor), or at the cursor. */
+  async function reviewCmd(typeId) {
+    const rv = R();
+    if (!rv) return;
+    if (!rv.on()) rv.setOn(true);
+    const def = markType(typeId);
+    let { from, to, empty, $from } = view.state.selection;
+    if ($from.parent.type === schema.nodes.code_block) { toast('Proofreader’s marks can’t go in code — add a comment instead (⌃⌥M)', 'info', 2600); return; }
+    if (def.at === 'range') {
+      if (empty) {
+        const text = $from.parent.textContent;
+        const off = $from.parentOffset;
+        let a = off, b = off;
+        while (a > 0 && /[\p{L}\p{N}'’-]/u.test(text[a - 1])) a--;
+        while (b < text.length && /[\p{L}\p{N}'’-]/u.test(text[b])) b++;
+        if (a === b) { toast('Select the text to mark', 'info'); return; }
+        from = $from.start() + a; to = $from.start() + b;
+      }
+      let clash = null;
+      view.state.doc.nodesBetween(from, to, (n) => { clash ||= n.marks.find((m) => m.type === reviewType) || null; });
+      if (clash) { toast('That text already has a proofreader’s mark — remove it first (right-click it), or mark other text', 'info', 2800); return; }
+    } else {
+      // A point: at the cursor, or just after the selected text (select a word, Insert Comma → after it).
+      from = to = empty ? from : to;
+    }
+    const docBefore = view.state.doc;
+    const quote = def.at === 'range' ? view.state.doc.textBetween(from, to, ' ')
+      : `${view.state.doc.textBetween(Math.max($from.start(), from - 24), from, ' ').slice(-24)}‸${view.state.doc.textBetween(from, Math.min($from.end(), from + 24), ' ')}`;
+    let text = null, note = '';
+    if (def.ask === 'text') {
+      const res = await dialog({ title: def.label.replace('…', ''), fields: [{ name: 'text', label: def.apply === 'replace' ? `Replace “${clipQ(quote)}” with` : 'Text to insert', value: '' }], ok: 'Mark' });
+      if (!res || res.text === '') { view.focus(); return; }
+      text = res.text;
+    } else if (def.ask === 'note') {
+      const res = await dialog({ title: def.label.replace('…', ''), fields: [{ name: 'note', label: `About “${clipQ(quote)}”`, type: 'textarea', rows: 3, placeholder: 'Your question or suggestion for the author' }], ok: 'Mark' });
+      if (!res || !res.note.trim()) { view.focus(); return; }
+      note = res.note.trim();
+    }
+    if (!view.state.doc.eq(docBefore)) { toast('The text changed — mark it again', 'info'); return; }
+    const id = newReviewId();
+    rv.create(id, { type: typeId, text, note: note || def.note || '', quote: clipQ(quote, 200) });
+    const tr = view.state.tr;
+    if (def.at === 'range') tr.addMark(from, to, reviewType.create({ id, type: typeId }));
+    else tr.insert(from, schema.nodes.review_point.create({ id, type: typeId }));
+    const end = def.at === 'range' ? to : from + 1;
+    view.dispatch(tr.setSelection(TextSelection.create(tr.doc, end)).scrollIntoView());
+    view.focus();
+    rv.changed?.(id);
+  }
+  /** The marks in the open text. */
+  const reviewRanges = () => reviewRangesIn(view.state.doc);
+  /** The marks the selection touches (or the one at the cursor). */
+  function reviewIdsInSelection() {
+    const { from, to, empty } = view.state.selection;
+    if (empty) { const id = reviewAtState(view.state); return id ? [id] : []; }
+    return reviewRanges().filter((r) => r.from < to && r.to > from || (r.point && r.from >= from && r.from <= to)).map((r) => r.id);
+  }
+  function selectReview(id) {
+    const r = reviewRanges().find((x) => x.id === id);
+    if (!r) return false;
+    const sel = r.point ? TextSelection.create(view.state.doc, r.to) : TextSelection.create(view.state.doc, r.from, r.to);
+    view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
+    view.focus();
+    return true;
+  }
+  /** Go to the next (1) or previous (-1) mark from the cursor, round to the start. */
+  function nextReview(dir = 1, { wrap = true } = {}) {
+    const all = reviewRanges();
+    if (!all.length) return null;
+    const cur = reviewAtState(view.state);
+    const at = view.state.selection.from;
+    const i = cur ? all.findIndex((r) => r.id === cur) : -1;
+    let r;
+    if (i >= 0) r = all[i + dir] || (wrap ? all[(i + dir + all.length) % all.length] : null);
+    else r = dir > 0 ? (all.find((x) => x.from >= at) || (wrap ? all[0] : null)) : ([...all].reverse().find((x) => x.to <= at) || (wrap ? all.at(-1) : null));
+    if (!r) return null;
+    selectReview(r.id);
+    return r.id;
+  }
+  /** Take every mark out of the open text (one undo step). Returns their ids. */
+  function clearReview() {
+    const ids = reviewRanges().map((r) => r.id);
+    if (!ids.length) return [];
+    const tr = view.state.tr;
+    for (const id of ids) removeReviewTr(tr, id);
+    view.dispatch(tr);
+    return ids;
+  }
+  /** Change the case of text from..to in a transaction, keeping its formatting. */
+  function caseTr(tr, from, to, mode) {
+    const parts = [];
+    tr.doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isText) return;
+      const a = Math.max(from, pos), b = Math.min(to, pos + node.nodeSize);
+      if (b > a) parts.push({ a, b, text: node.text.slice(a - pos, b - pos), marks: node.marks });
+    });
+    const joined = changeCase(parts.map((p) => p.text).join(''), mode);
+    let i = 0;
+    for (const p of parts) { p.out = joined.slice(i, i + p.text.length); i += p.text.length; }
+    for (const p of [...parts].reverse()) if (p.out !== p.text) tr.replaceWith(p.a, p.b, schema.text(p.out, p.marks));
+  }
+  /**
+   * Finish with a mark. accept: make the change it asks for (if Lutefisk can), then take the mark
+   * away; otherwise (Reject, or a mark you fixed by hand) just take it away. One undo step.
+   * Returns 'accepted', 'resolved', or null when the change has to be made by hand.
+   */
+  function finishReview(id, accept) {
+    const r = reviewRanges().find((x) => x.id === id);
+    if (!r) return null;
+    const rv = R();
+    const def = markType(r.type);
+    const rec = rv?.info?.(id) || {};
+    const guide = rv?.guide?.() || 'cmos';
+    const tr = view.state.tr;
+    if (!accept || !canApply(def, rec, guide)) {
+      removeReviewTr(tr, id);
+      view.dispatch(tr.scrollIntoView());
+      return 'resolved';
+    }
+    const text = markText(def, guide, rec);
+    const hand = () => { toast(`Make this change by hand, then press Resolve`, 'info', 2600); return null; };
+    if (r.point) {
+      const pos = r.from;
+      const marks = view.state.doc.resolve(pos).marks().filter((m) => m.type !== reviewType);
+      removeReviewTr(tr, id);
+      if (def.apply === 'insert') tr.insert(pos, schema.text(text, marks));
+      else if (def.apply === 'split') { if (!tr.doc.resolve(pos).parent.isTextblock) return hand(); tr.split(pos); }
+      else if (def.apply === 'join') {
+        const $p = tr.doc.resolve(pos);
+        if ($p.parentOffset !== 0 || !canJoin(tr.doc, $p.before())) return hand();
+        tr.join($p.before());
+      }
+    } else {
+      const { from, to } = r;
+      removeReviewTr(tr, id);
+      const first = [];
+      tr.doc.nodesBetween(from, to, (n) => { if (n.isText && !first.length) first.push(n); });
+      const marks = first[0]?.marks || [];
+      switch (def.apply) {
+        case 'delete': tr.delete(from, to); break;
+        case 'replace': if (text) tr.replaceWith(from, to, schema.text(text, marks)); else tr.delete(from, to); break;
+        case 'wrap': { const [open, close] = text || ['“', '”']; tr.insertText(close, to); tr.insertText(open, from); break; }
+        case 'upper': caseTr(tr, from, to, 'upper'); break;
+        case 'lower': caseTr(tr, from, to, 'lower'); break;
+        case 'italic': tr.addMark(from, to, schema.marks.em.create()); break;
+        case 'bold': tr.addMark(from, to, schema.marks.strong.create()); break;
+        case 'roman': tr.removeMark(from, to, schema.marks.em); tr.removeMark(from, to, schema.marks.strong); break;
+        case 'closeup': {
+          const gaps = [];
+          tr.doc.nodesBetween(from, to, (n, pos) => {
+            if (!n.isText) return;
+            for (const m of n.text.matchAll(/\s+/g)) {
+              const a = Math.max(from, pos + m.index), b = Math.min(to, pos + m.index + m[0].length);
+              if (b > a) gaps.push([a, b]);
+            }
+          });
+          if (!gaps.length) return hand();
+          for (const [a, b] of gaps.reverse()) tr.delete(a, b);
+          break;
+        }
+        case 'transpose': {
+          const t = tr.doc.textBetween(from, to, '￼', '￼');
+          if (t.includes('￼')) return hand();
+          const w = /^(\S+)(\s+)(\S+)$/u.exec(t);
+          const chars = [...t];
+          const out = w ? `${w[3]}${w[2]}${w[1]}` : chars.length === 2 ? `${chars[1]}${chars[0]}` : null;
+          if (!out) return hand();
+          tr.replaceWith(from, to, schema.text(out, marks));
+          break;
+        }
+        default: break;
+      }
+    }
+    view.dispatch(tr.scrollIntoView());
+    view.focus();
+    return 'accepted';
+  }
+  /**
+   * Add Mark: every mark and the book's style-guide rules in one list, with a search box —
+   * type “comma”, “cap”, “del” or “serial” and press Return (↑ ↓ to choose).
+   */
+  function reviewPicker(anchor) {
+    const rv = R();
+    if (!rv || !anchor) return;
+    const g = rv.guide();
+    const all = [
+      ...MARKS.map((m) => ({ ...m, where: MARK_GROUPS.find(([k]) => k === m.group)?.[1] || '' })),
+      ...GUIDE_RULES[g].map((m) => ({ ...m, where: `${GUIDES[g].short} rules` })),
+    ];
+    const input = h('input', { type: 'search', class: 'rv-find', placeholder: 'Search marks — del, comma, cap, serial…', 'aria-label': 'Search proofreader’s marks', spellcheck: 'false' });
+    const list = h('div', { class: 'rv-find-list', role: 'listbox', 'aria-label': 'Proofreader’s marks' });
+    let shown = [], at = 0;
+    const choose = (m) => { closePopovers(); setTimeout(() => reviewCmd(m.id)); };
+    const draw = () => {
+      const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      shown = all.filter((m) => { const hay = `${m.label} ${m.abbr} ${m.where} ${m.id} ${m.note || ''}`.toLowerCase(); return words.every((w) => hay.includes(w)); });
+      at = Math.min(at, Math.max(0, shown.length - 1));
+      let last = null;
+      const rows = [];
+      shown.forEach((m, i) => {
+        if (m.where !== last) { rows.push(h('div', { class: 'rv-find-head' }, m.where)); last = m.where; }
+        rows.push(h('button', { type: 'button', role: 'option', class: `rv-find-item${i === at ? ' on' : ''}`, 'aria-selected': String(i === at), title: m.note || '', onmousedown: (e) => e.preventDefault(), onmouseenter: () => { at = i; mark(); }, onclick: () => choose(m) },
+          h('span', { class: 'rv-find-abbr' }, m.abbr.replace(/‸/g, '^')), h('span', { class: 'rv-find-label' }, m.label)));
+      });
+      list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'rv-find-empty' }, 'No marks match')]));
+    };
+    const mark = () => list.querySelectorAll('.rv-find-item').forEach((b, i) => { b.classList.toggle('on', i === at); b.setAttribute('aria-selected', String(i === at)); if (i === at) b.scrollIntoView({ block: 'nearest' }); });
+    input.addEventListener('input', () => { at = 0; draw(); });
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (shown.length) { at = (at + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length; mark(); } }
+      else if (e.key === 'Enter') { e.preventDefault(); if (shown[at]) choose(shown[at]); }
+      else if (e.key === 'Escape') { e.preventDefault(); closePopovers(); view.focus(); }
+    });
+    draw();
+    popover(anchor, [{ node: h('div', { class: 'rv-find-box' }, input, list) }], { width: 300 });
+    requestAnimationFrame(() => input.focus());
+  }
+  /** Right-click and the + menu: search, the marks by kind, the guide's own rules, and Clear Here. */
+  function reviewMenuItems(anchorAt) {
+    const rv = R();
+    if (!rv) return [];
+    const g = rv.guide();
+    const item = (m) => ({ label: m.label, hint: m.abbr, onClick: () => setTimeout(() => reviewCmd(m.id)) });
+    const search = () => {
+      const a = anchorAt ? h('span', { class: 'ctx-anchor', style: { left: `${anchorAt.x}px`, top: `${anchorAt.y}px` } }) : null;
+      if (a) document.body.append(a);
+      setTimeout(() => { reviewPicker(a || toolbar); if (a) setTimeout(() => a.remove(), 0); });
+    };
+    const n = reviewRanges().length;
+    return [
+      { label: 'Search Marks…', icon: 'search', onClick: search },
+      '-',
+      { header: `Proofreader’s marks · ${GUIDES[g].short}` },
+      ...MARK_GROUPS.filter(([k]) => k !== 'query').map(([k, label]) => ({ label, icon: { edit: 'pen', punct: 'quote', space: 'newline', type: 'textStyle' }[k], subWidth: 250, submenu: () => MARKS.filter((m) => m.group === k).map(item) })),
+      { ...item(MARKS.find((m) => m.id === 'query')), icon: 'help' },
+      '-',
+      { label: `${GUIDES[g].short} Rules`, icon: 'book', subWidth: 290, submenu: () => [{ header: GUIDES[g].name }, ...GUIDE_RULES[g].map(item)] },
+      ...(n ? ['-', { label: 'Clear Marks Here…', icon: 'eraser', hint: String(n), onClick: () => setTimeout(() => rv.clearHere?.()) }] : []),
+    ];
+  }
+  /** What a mark under the pointer offers: Accept, Reject, a note, Remove. */
+  function reviewMarkItems(id) {
+    const rv = R();
+    const r = reviewRanges().find((x) => x.id === id);
+    if (!rv || !r) return [];
+    const def = markType(r.type);
+    const rec = rv.info(id) || {};
+    const auto = canApply(def, rec, rv.guide());
+    return [
+      { header: `${def.label.replace('…', '')}${rec.author ? ` · ${rec.author}` : ''}` },
+      ...(auto ? [{ label: 'Make This Change', icon: 'check', onClick: () => rv.finish(id, true) }] : []),
+      { label: rec.note ? 'Edit Note…' : 'Add Note…', icon: 'comment', onClick: () => setTimeout(() => rv.editNote(id)) },
+      { label: 'Color', icon: 'palette', subWidth: 170, submenu: () => Object.entries(INKS).map(([k, x]) => ({ label: x.label, swatch: x.light, icon: (rec.ink || 'red') === k ? 'check' : null, onClick: () => rv.recolor?.([id], k) })) },
+      { label: 'Remove Mark', icon: 'trash', onClick: () => rv.finish(id, false, 'removed') },
+      '-',
+    ];
+  }
+
   /**
    * Insert Code…: Block (a code block with a language, line numbers and
    * colors) or Inline (code in the sentence). The language and layout are remembered.
@@ -1497,15 +1943,19 @@ export function createEditor(mount, ctx) {
     const link = !inCode ? linkItems(at) : [];
     const onLink = link.length > 1;
     // At the top, always in this order: Add Card, Add Character, Add Comment (Delete Comment inside one),
-    // Add Random Thought. With text selected, each starts from it.
+    // Add Thought. With text selected, each starts from it.
     const cardTop = [
       ...(inCode || !ctx.makeCard ? [] : [{ label: 'Add Card', icon: 'card', hint: hasSel ? 'from selection' : '', onClick: () => ctx.makeCard(hasSel ? selectionMarkdown() : '', selText) }]),
       ...(inCode || !ctx.addAsCharacter ? [] : [{ label: 'Add Character', icon: 'person', hint: hasSel ? 'from selection' : '', onClick: () => ctx.addAsCharacter(selText || '') }]),
       { label: cid ? 'Delete Comment' : 'Add Comment', icon: cid ? 'trash' : 'comment', hint: cid ? '' : '⌃⌥M', onClick: cid ? () => { removeComment(cid); ctx.deleteComment?.(cid); } : commentCmd },
-      ...(!ctx.newThought ? [] : [{ label: 'Add Random Thought', icon: 'thought', hint: hasSel ? 'from selection' : '', onClick: () => ctx.newThought(hasSel ? selText : '') }]),
+      ...(!ctx.newThought ? [] : [{ label: 'Add Thought', icon: 'thought', hint: hasSel ? 'from selection' : '', onClick: () => ctx.newThought(hasSel ? selText : '') }]),
       '-',
     ];
+    // Review mode: the mark under the pointer first, then the marks to make.
+    const rid = !inCode && ctx.review?.on?.() ? (at ? reviewAtPos(view.state.doc, at.pos) : null) || reviewAtState(view.state) : null;
+    const reviewTop = !inCode && ctx.review?.on?.() ? [...(rid ? reviewMarkItems(rid) : []), { label: 'Proofreader’s Marks', icon: 'proof', subWidth: 240, submenu: () => reviewMenuItems({ x: e.clientX, y: e.clientY }) }, '-'] : [];
     const items = [
+      ...reviewTop,
       ...cardTop,
       ...lintItems,
       { label: 'Cut', icon: 'clear', hint: '⌘X', disabled: !hasSel, onClick: () => { view.focus(); document.execCommand('cut'); } },
@@ -1852,14 +2302,17 @@ export function createEditor(mount, ctx) {
       '-',
       { label: 'Citation…', icon: 'cite', hint: `${IS_MAC ? '⌥⌘' : 'Ctrl+Alt+'}C`, onClick: () => citeCmd() },
       { label: 'Footnote', icon: 'footnote', hint: `${IS_MAC ? '⌥⌘' : 'Ctrl+Alt+'}F`, onClick: () => footnoteCmd() },
+      { label: 'Checkbox', icon: 'checklist', hint: '[ ]', onClick: () => insertBox() },
       '-',
       { label: 'New Line', icon: 'newline', hint: IS_MAC ? '⇧↵' : 'Shift+Enter', onClick: run(insertLineBreak) },
       { label: 'Horizontal Line', icon: 'hline', onClick: run(insertHorizontalLine) },
       { label: 'Page Break', icon: 'pagebreak', hint: IS_MAC ? '⌘↵' : 'Ctrl+Enter', onClick: run(insertPageBreak) },
       { label: 'Scene Break', icon: 'scene', onClick: run(insertSceneBreak) },
+      // Only while proofreading (the pencil above the editor turns it on).
+      ...(ctx.review?.on?.() ? ['-', { label: 'Proofreader’s Marks', icon: 'proof', subWidth: 240, submenu: () => reviewMenuItems() }] : []),
     ];
   }
-  const insertMenu = menuBtn('plus', 'Insert — link, image, list, table, code, formula, symbol, drawing, citation, footnote, line or break', insertItems, (s) => isInTable(s) || s.selection.$from.parent.type === schema.nodes.code_block || markActive(s, schema.marks.link) || inAncestor(s, schema.nodes.bullet_list) || inAncestor(s, schema.nodes.ordered_list));
+  const insertMenu = menuBtn('plus', 'Insert — link, image, list, table, code, formula, symbol, drawing, citation, footnote, checkbox, line, break or proofreader’s mark', insertItems, (s) => isInTable(s) || s.selection.$from.parent.type === schema.nodes.code_block || markActive(s, schema.marks.link) || inAncestor(s, schema.nodes.bullet_list) || inAncestor(s, schema.nodes.ordered_list));
 
   // One tidy row (it wraps by group when the editor is narrow):
   // history · style · character formatting · color · paragraph · insert · lines.
@@ -2036,6 +2489,21 @@ export function createEditor(mount, ctx) {
       view.dispatch(tr); view.focus();
     },
     editDrawing: (pos, node) => drawCmd(pos, node),
+    /* Review mode */
+    reviewRanges: () => reviewRanges(),
+    reviewAt: () => reviewAtState(view.state),
+    reviewIdsInSelection: () => reviewIdsInSelection(),
+    reviewMark: (type) => reviewCmd(type),
+    finishReview: (id, accept) => finishReview(id, accept),
+    removeReview: (id) => { const tr = removeReviewTr(view.state.tr, id); if (tr.docChanged) view.dispatch(tr); },
+    selectReview: (id) => selectReview(id),
+    nextReview: (dir, opts) => nextReview(dir, opts),
+    clearReview: () => clearReview(),
+    toolbar,
+    /** Review went on or off, or a mark's note changed: draw the marks again. */
+    refreshReview() { view.dispatch(view.state.tr.setMeta(reviewKey, true).setMeta('addToHistory', false)); },
+    reviewMenuItems: () => reviewMenuItems(),
+    reviewPicker: (anchor) => reviewPicker(anchor),
     commentRanges: () => commentRanges(),
     commentAt: () => commentAt(),
     removeComment: (id) => removeComment(id),

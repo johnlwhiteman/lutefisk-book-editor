@@ -5,9 +5,11 @@
 //  * Footnotes: text[^1] … and a definition line `[^1]: note text`
 //  * Image attributes: ![alt](assets/pic.jpg){width=60% align=center}
 //  * Scene breaks: a thematic break (***) renders as the template's ornament
+//  * Proofreader's marks (Review mode) render as nothing: see reviewRule
 import { mathRule, renderMathToken, collectMath } from './math.js';
 import { highlightCode, normalizeLang, parseCodeInfo, numberLines } from './code.js';
 import MarkdownIt from 'markdown-it';
+import { REVIEW_CLOSE_RE, REVIEW_POINT_AT, stripReview } from './review.js';
 
 const FN_DEF = /^\[\^([^\]\s]+)\]:[ \t]?(.*)$/;
 
@@ -63,6 +65,39 @@ function commentRule(state, silent) {
     state.push('comment_close', 'span', -1).meta = { id: m[1] };
   }
   state.pos = innerEnd + m[0].length;
+  return true;
+}
+
+/**
+ * Proofreader's marks (Review mode): {%%marked text%%}{%r-id:type%} on a range, {%r-id:type%} at
+ * a point. They render as nothing — the marked text renders as written — so no export or preview
+ * ever shows them. The editor reads the tokens to draw the marks.
+ */
+export { stripReview };
+function reviewRule(state, silent) {
+  const src = state.src;
+  const start = state.pos;
+  if (src.charCodeAt(start) !== 0x7b /* { */ || src.charCodeAt(start + 1) !== 0x25 /* % */) return false;
+  if (src.charCodeAt(start + 2) === 0x25) {
+    const m = REVIEW_CLOSE_RE.exec(src.slice(start + 3, state.posMax));
+    if (!m) return false;
+    const innerEnd = start + 3 + m.index;
+    if (!silent) {
+      const oldMax = state.posMax;
+      state.push('review_open', 'span', 1).meta = { id: m[1], type: m[2] };
+      state.pos = start + 3;
+      state.posMax = innerEnd;
+      state.md.inline.tokenize(state);
+      state.posMax = oldMax;
+      state.push('review_close', 'span', -1).meta = { id: m[1], type: m[2] };
+    }
+    state.pos = innerEnd + m[0].length;
+    return true;
+  }
+  const m = REVIEW_POINT_AT.exec(src.slice(start, state.posMax));
+  if (!m) return false;
+  if (!silent) state.push('review_point', '', 0).meta = { id: m[1], type: m[2] };
+  state.pos = start + m[0].length;
   return true;
 }
 
@@ -371,6 +406,7 @@ export function createMarkdown({ typographer = true } = {}) {
   md.inline.ruler.before('link', 'fnref', footnoteRefRule);
   md.inline.ruler.before('link', 'cite', citeRule);
   md.inline.ruler.before('link', 'comment', commentRule);
+  md.inline.ruler.before('link', 'review', reviewRule);
   md.inline.ruler.after('escape', 'math', mathRule);
   md.core.ruler.after('inline', 'image_attrs', imageAttrsRule);
 
@@ -387,6 +423,9 @@ export function createMarkdown({ typographer = true } = {}) {
   md.renderer.rules.math = (tokens, idx, _o, env) => renderMathToken(tokens[idx].meta, env);
   md.renderer.rules.comment_open = () => '';
   md.renderer.rules.comment_close = () => '';
+  md.renderer.rules.review_open = () => '';
+  md.renderer.rules.review_close = () => '';
+  md.renderer.rules.review_point = () => '';
   md.renderer.rules.cite = (tokens, idx, _o, env) => {
     const { ref, locator } = tokens[idx].meta;
     const text = env.cite ? env.cite(ref, locator) : `(${ref})`;

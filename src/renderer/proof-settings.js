@@ -63,7 +63,7 @@ export function openDictionary(sheet, { get, save }) {
       : [h('p', { class: 'hint dc-empty' }, all.length ? 'No words match.' : 'No words yet. Add names, places and invented words here, or right-click an underlined word in your text › Add to Dictionary.')]));
   }
   draw();
-  const body = h('div', { class: 'dc' },
+  const body = h('div', { class: 'dict-dlg' },
     h('p', { class: 'hint' }, 'Words here are never marked as misspelled, in any book. Click a word to correct it.'),
     h('div', { class: 'dc-bar' }, h('div', { class: 'dc-add-wrap' }, add, h('button', { type: 'button', class: 'btn small primary', onclick: addWord }, icon('plus', 13), 'Add')), find),
     list);

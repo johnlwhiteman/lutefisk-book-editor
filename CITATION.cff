@@ -11,8 +11,8 @@ abstract: >-
   Markdown and plain text) entirely on your own computer — no accounts, no
   cloud, no tracking.
 authors:
-  # Add each person as: - given-names: "First"  family-names: "Last"  (orcid: "https://orcid.org/…")
-  - name: "The Lutefisk Book Editor authors"
+  - given-names: "John L."
+    family-names: "Whiteman"
 version: "1.0.0"
 date-released: "2026-11-18"
 license: MIT

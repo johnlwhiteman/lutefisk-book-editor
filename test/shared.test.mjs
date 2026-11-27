@@ -497,3 +497,10 @@ test('goals: words or pages and/or hours; old "either one" goals keep their amou
   assert.equal(goalProgress({ words: 1400, minutes: 30 }, { pages: 5, minutes: 60 }, 280).met, false);
   assert.equal(goalProgress({ words: 1400, minutes: 60 }, { pages: 5, minutes: 60 }, 280).met, true);
 });
+
+test('the app’s own styles never reach the book’s drop-cap class (it widened chapters past small screens)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/renderer/styles/app.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // .dc is on every chapter with a drop cap (bookhtml.js); app.css styles the editor and dialogs only.
+  assert.doesNotMatch(css, /(^|[\s,}>+~])\.dc(?![\w-])/m);
+});

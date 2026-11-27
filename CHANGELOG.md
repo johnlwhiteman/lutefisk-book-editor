@@ -4,7 +4,30 @@ All notable changes to Lutefisk Book Editor are listed here, newest first. The f
 
 ## [Unreleased]
 
+### Fixed
+
+- The device preview cut off the right side of chapters on small screens (iPhone, Galaxy S26, Kindle Basic, GlowLight 3 and 4): a style meant for the dictionary dialog also matched the book's drop-cap class and forced chapters to at least 520 px wide.
+
+### Added
+
+- Proofreading: highlight marks (or click a mark’s label) and click an ink in the row to change their color. The right-click and + menus show **Proofreader’s Marks** only while proofreading.
+- **Checkboxes**: + › **Checkbox**, or type `[ ]` (or `[x]`) and a space at the start of a line. Click a box in the editor to check or uncheck it. Saved as ☐ and ☑, so the previews and every export show them.
+- Proofreading inks: **red** (the default each time the app opens), **blue**, **green** and **purple**. Each mark keeps the ink it was made in; the palette beside the inks makes every mark one color, and right-click a mark › **Color** changes just that one. The row no longer shows a pencil, and its count reads “1 Mark” / “7 Marks” — nothing at all, and no arrows, when there are none.
+- **Book settings › Style**: choose the book's citation and bibliography style and its proofreading style (Chicago, AP or APA) in one place, and clear every proofreader's mark in the book.
+- **Add Mark** searches: type “comma”, “cap”, “del” or “serial”, ↑ ↓ to choose, Return to mark. Right-click › Proofreader's Mark › **Search Marks…** does the same.
+- **Proofreading**: mark up the manuscript with proofreader’s marks, written over the text by hand in **red or dark-blue ink** (in the Caveat handwriting face, bundled; editor only). Click the pencil above the editor (**⌥⌘R**, Tools › Proofreading) and a second row opens under the toolbar: the ink, **Add Mark**, **‹ ›** to step through the open marks in this chapter or scene and then on through the book, and **Done**. Proofreading is off each time the app opens. The style guide (**The Chicago Manual of Style**, **AP Stylebook** or **APA Style**) is chosen in Book settings › Style and adds its own rules to the menu. Marks are also in right-click › **Proofreader’s Mark** and the **+** menu: delete, insert, replace, transpose, stet, spell out, punctuation, space, close up, new paragraph, run in, move, cap, lc, small caps, ital, bold, roman, wrong font and Query to Author. Right-click a mark to remove it, add a note, or make its change. Click the pencil again, or Done, to finish — the marks stay, hidden, until cleared. They never appear in the previews or any export. Open marks are listed in the **Book Audit** (Proofreader’s marks), count toward its number, and can’t be ignored. Saved in the chapter Markdown as `{%%text%%}{%r-id:type%}` and `{%r-id:type%}`, with who made each mark and its note in lutefisk.yaml under `review`.
+- Counts on the tools above the editor: Characters (in the book) and Comments (open in this text) in gray; Spelling and Grammar (possible problems in this text, while that check is on) and Proofreading (open marks in the book) in red.
+
 ### Changed
+
+- **A smaller app** (about 17 MB less installed, nothing removed or degraded):
+  - The spelling and grammar checker's data (Harper, 20 MB) ships gzipped (8 MB) and is unpacked byte for byte as it loads.
+  - Windows and Linux builds keep only the Chromium interface languages the app itself offers (English, German, French, Italian, Spanish, Polish, Russian, Ukrainian, Indonesian, Malay, Vietnamese, Japanese, Chinese and Korean); others fall back to English, as the app's own interface does. macOS is unchanged (those files are inside the signed Electron framework).
+  - Every PNG (screenshots, icons) losslessly recompressed — the same pixels, about 20% smaller.
+- The README's feature list is a short bullet list, with a Proofread section and screenshots.
+- CITATION.cff names the author: John L. Whiteman.
+
+- **Random Thoughts** are now just **Thoughts**.
 
 - In Research, the notes pane is called **README.md** (the file it is).
 - The icons above the editor (Characters, Comments, Spelling, Grammar, Tools, Random Thoughts) show just their name when you point at them. The character card no longer has Hide marks.

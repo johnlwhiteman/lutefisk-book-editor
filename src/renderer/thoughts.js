@@ -1,8 +1,8 @@
-// Random Thoughts: anything that pops into your head while you write — an idea,
+// Thoughts: anything that pops into your head while you write — an idea,
 // a line, a what-if. Each one is just text. They're kept with the book
 // (book.thoughts in lutefisk.yaml) and never go into the book itself.
 //
-// Two ways in: right-click in your text › Add Random Thought (a small box at
+// Two ways in: right-click in your text › Add Thought (a small box at
 // the mouse; Return saves), and the thought-bubble button beside Tools, which
 // lists them all to add, edit or delete.
 import { h, icon, toast, timeAgo } from './ui.js';
@@ -50,15 +50,15 @@ function growing(attrs) {
  */
 export function quickThought(ctx) {
   document.querySelector('.th-quick')?.remove();
-  const ta = growing({ class: 'th-input', placeholder: 'A random thought…', 'aria-label': 'Random thought' });
+  const ta = growing({ class: 'th-input', placeholder: 'A thought…', 'aria-label': 'Thought' });
   // Two choices: keep where you are, and keep the text you'd highlighted (shown, so you know what's kept).
   const quote = String(ctx.text || '').replace(/\s+/g, ' ').trim();
   const loc = ctx.where?.label ? option(`Save where I am — ${ctx.where.label}`, true, 'Click the place on the thought later to come back here') : null;
   const hl = quote ? option('Include the highlighted text', true) : null;
   const quoteEl = quote ? h('blockquote', { class: 'th-quote' }, quote.length > 220 ? `${quote.slice(0, 219)}…` : quote) : null;
   hl?.box.addEventListener('change', () => { quoteEl.hidden = !hl.box.checked; });
-  const box = h('div', { class: 'th-quick', role: 'dialog', 'aria-label': 'Add random thought' },
-    h('div', { class: 'th-quick-head' }, icon('thought', 14), 'Add Random Thought'),
+  const box = h('div', { class: 'th-quick', role: 'dialog', 'aria-label': 'Add thought' },
+    h('div', { class: 'th-quick-head' }, icon('thought', 14), 'Add Thought'),
     quoteEl, ta,
     loc || hl ? h('div', { class: 'th-opts' }, hl?.el, loc?.el) : null,
     h('small', { class: 'th-quick-hint' }, 'Return to save · Esc to cancel'));
@@ -66,7 +66,7 @@ export function quickThought(ctx) {
     if (!box.isConnected) return;
     document.removeEventListener('mousedown', outside, true);
     const extra = { where: loc?.box.checked ? ctx.where : null, quote: hl?.box.checked ? quote : '' };
-    if (save && addThought(ctx.book, ta.value, extra)) { ctx.markDirty?.(); ctx.onChange?.(); toast('Saved to Random Thoughts', 'ok', 1400); }
+    if (save && addThought(ctx.book, ta.value, extra)) { ctx.markDirty?.(); ctx.onChange?.(); toast('Saved to Thoughts', 'ok', 1400); }
     box.remove();
     ctx.done?.();
   };
@@ -92,7 +92,7 @@ export function quickThought(ctx) {
 export function openThoughts(ctx) {
   const { book } = ctx;
   const changed = () => { ctx.markDirty?.(); ctx.onChange?.(); count(); };
-  const add = growing({ class: 'th-input th-add', placeholder: 'A random thought…', 'aria-label': 'Add random thought' });
+  const add = growing({ class: 'th-input th-add', placeholder: 'A thought…', 'aria-label': 'Add thought' });
   const addBtn = h('button', { type: 'button', class: 'btn primary small th-add-btn', disabled: true, onclick: () => doAdd() }, 'Add');
   const loc = ctx.where?.label ? option(`Save where I am — ${ctx.where.label}`, false, 'Click the place on the thought later to come back here') : null;
   add.addEventListener('input', () => { addBtn.disabled = !add.value.trim(); });
@@ -121,7 +121,7 @@ export function openThoughts(ctx) {
       return;
     }
     list.replaceChildren(...all.map((th) => {
-      const ta = growing({ class: 'th-text', 'aria-label': 'Random thought', spellcheck: 'true' });
+      const ta = growing({ class: 'th-text', 'aria-label': 'Thought', spellcheck: 'true' });
       ta.value = th.text;
       ta.addEventListener('input', () => { th.text = ta.value; th.edited = new Date().toISOString(); ctx.markDirty?.(); });
       // Emptied and left: it's gone (to the Recycle Bin).
@@ -143,6 +143,6 @@ export function openThoughts(ctx) {
     h('div', { class: 'th-new-wrap' }, h('div', { class: 'th-new' }, add, addBtn), loc ? h('div', { class: 'th-opts' }, loc.el) : null),
     list);
   draw(); count();
-  const closeSheet = ctx.sheet('Random Thoughts', body, { actions: countEl, onClose: () => ctx.onClose?.() });
+  const closeSheet = ctx.sheet('Thoughts', body, { actions: countEl, onClose: () => ctx.onClose?.() });
   requestAnimationFrame(() => add.focus());
 }

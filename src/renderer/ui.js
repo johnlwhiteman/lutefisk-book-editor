@@ -213,6 +213,9 @@ const ICON_PATHS = {
   system: 'M3.5 5h17v11.5h-17zM8.5 20.5h7M12 16.5v4M12 5v11.5M12 8.5h8.5M12 12h8.5',
   // Audit: a magnifier with a check in it.
   audit: 'M10.5 17.5a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM15.5 15.5L20.5 20.5M7.6 10.7l2 2 3.6-3.7',
+  // Review mode: a proofreader's pencil and caret (‸), and the same struck through.
+  proof: 'M3 17l2.6-.6L15.8 6.2a1.9 1.9 0 0 0-2.7-2.7L2.9 13.7 3 17zM12 5l2.7 2.7M13 21l3.5-6 3.5 6',
+  proofOff: 'M3 17l2.6-.6L15.8 6.2a1.9 1.9 0 0 0-2.7-2.7L2.9 13.7 3 17zM12 5l2.7 2.7M13 21l3.5-6 3.5 6M2.5 2.5l19 19',
   warn: 'M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.4v.1',
   grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
   highlighter: 'M14.5 4.5l5 5-8 8H8.5v-3zM8.5 14.5l-3 3v1.5h4l2-2M13 6l5 5',

@@ -1,7 +1,8 @@
 // Build script: bundles main, preload and renderer with esbuild and copies
 // static assets (HTML, CSS, fonts) into dist/. No network access required.
 import { build } from 'esbuild';
-import { cpSync, mkdirSync, rmSync, readdirSync, copyFileSync, existsSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, rmSync, readdirSync, copyFileSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FONTS } from '../src/shared/fonts.js';
@@ -70,8 +71,18 @@ for (const f of FONTS.filter((f) => f.pkg)) {
   copyFileSync(join(root, 'node_modules', '@fontsource', 'stix-two-math', 'files', name), join(dist, 'renderer', 'fonts', name));
   // Harper, the local spelling and grammar checker (WebAssembly; runs entirely on this computer).
   mkdirSync(join(dist, 'renderer', 'harper'), { recursive: true });
-  copyFileSync(join(root, 'node_modules', 'harper.js', 'dist', 'harper_wasm_bg.wasm'), join(dist, 'renderer', 'harper', 'harper.wasm'));
+  // Shipped gzipped (20 MB → about 8 MB); the app:// handler serves it as harper.wasm, unchanged.
+  writeFileSync(join(dist, 'renderer', 'harper', 'harper.wasm.gz'), gzipSync(readFileSync(join(root, 'node_modules', 'harper.js', 'dist', 'harper_wasm_bg.wasm')), { level: 9 }));
   css += `@font-face{font-family:'STIX Two Math';font-style:normal;font-weight:400;font-display:block;src:url('../fonts/${name}') format('woff2')}\n`;
+}
+// A handwriting face for Review mode's proofreader's marks (Caveat, OFL). Editor only — never offered for books.
+for (const weight of [400, 700]) {
+  for (const subset of ['latin', 'latin-ext']) {
+    const name = `caveat-${subset}-${weight}-normal.woff2`;
+    copyFileSync(join(root, 'node_modules', '@fontsource', 'caveat', 'files', name), join(dist, 'renderer', 'fonts', name));
+    const range = subset === 'latin' ? 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2212' : 'U+0100-02BA,U+02BD-02C5,U+1E00-1E9F,U+A720-A7FF';
+    css += `@font-face{font-family:'Lutefisk Hand';font-style:normal;font-weight:${weight};font-display:swap;src:url('../fonts/${name}') format('woff2');unicode-range:${range}}\n`;
+  }
 }
 writeFileSync(join(dist, 'renderer', 'styles', 'fonts.css'), css);
 // The README, shown in Help › Read Me, with its screenshots.

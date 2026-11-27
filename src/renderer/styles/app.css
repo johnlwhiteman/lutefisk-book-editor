@@ -2424,7 +2424,8 @@ html[data-editor-font]:not([data-editor-font=""]) .ql-editor { font-family: var(
 .st-proof > span:first-child { min-width: 120px; }
 .st-proof-sum { flex: 1; color: var(--text-3); font-size: 12.5px; }
 /* Your Dictionary */
-.dc { display: flex; flex-direction: column; gap: 10px; min-width: min(520px, 80vw); }
+/* The dictionary dialog. (Not .dc — that's the book's drop-cap class, and a min-width on it widened chapters past small screens.) */
+.dict-dlg { display: flex; flex-direction: column; gap: 10px; min-width: min(520px, 80vw); }
 .dc-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .dc-add-wrap { display: flex; gap: 6px; flex: 1; min-width: 220px; }
 .dc-add-wrap input { flex: 1; }
@@ -2676,7 +2677,7 @@ html[data-high-contrast="on"] .sidebar { background: var(--chrome); --sb-card: v
 html[data-high-contrast="on"] .sb-book-grid .sb-cover { transform: none; }
 @media (prefers-reduced-motion: reduce) { .sb-book-grid .sb-cover { transition: none; } }
 
-/* ==== Random Thoughts ==== */
+/* ==== Thoughts ==== */
 .tool-thoughts .icon { color: color-mix(in srgb, #d98a3d 70%, var(--text-2)); }
 /* The quick box from the right-click menu */
 .th-quick { position: fixed; z-index: 10001; width: 320px; padding: 10px 12px 8px; border-radius: 14px; background: var(--raised); box-shadow: var(--shadow-lg), 0 0 0 .5px var(--sep); }
@@ -2685,7 +2686,7 @@ html[data-high-contrast="on"] .sb-book-grid .sb-cover { transform: none; }
 .th-input { width: 100%; box-sizing: border-box; min-height: 38px; max-height: 240px; padding: 8px 10px; border: 0; border-radius: 9px; background: var(--fill); color: var(--text); font: inherit; font-size: 14px; line-height: 1.45; resize: none; outline: none; }
 .th-input:focus { box-shadow: 0 0 0 2px var(--accent-soft), inset 0 0 0 1px var(--accent); background: var(--surface); }
 .th-quick-hint { display: block; margin-top: 5px; font-size: 11px; color: var(--text-3); }
-/* The Random Thoughts window */
+/* The Thoughts window */
 .th { display: flex; flex-direction: column; gap: 12px; width: min(560px, 80vw); }
 .th-new { display: flex; align-items: flex-end; gap: 8px; }
 .th-new .th-input { flex: 1; }
@@ -2752,7 +2753,7 @@ html[data-high-contrast="on"] .ProseMirror .pm-char-dot { width: 5px; height: 5p
 @media print { .ProseMirror .pm-char-dot { display: none; } }
 .au-chip.name { background: var(--fill); text-decoration: none; font-weight: 550; }
 
-/* Random Thoughts: where it was written, and the text that was highlighted */
+/* Thoughts: where it was written, and the text that was highlighted */
 .th-opts { display: flex; flex-direction: column; gap: 3px; margin-top: 7px; }
 .th-opt { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .th-opt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2824,3 +2825,69 @@ html[data-skin]:not([data-skin="classic"]):not([data-skin="contrast"]):not([data
 
 /* Renaming a chapter or scene in the binder. */
 .sb-rename { flex: 1; min-width: 0; height: 26px; margin: 2px 4px 2px 6px; padding: 0 6px; border: 0; border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-size: 13.5px; box-shadow: inset 0 0 0 1.5px var(--accent); outline: none; }
+
+/* ---------------------------------------------------------------- Review mode: proofreader's marks
+   Written over the text by hand, in red, blue, green or purple ink. Only in the editor, only while Review is on.
+   review.js defines each ink's color and strokes (.rv-ink-red { --rv-ink; --rv-strike; … }). */
+:root { --rv-red: #c0262d; --rv-ink: var(--rv-red); }
+@media (prefers-color-scheme: dark) { :root { --rv-red: #ff7d72; } }
+
+/* The toolbar's second row: the inks and Recolor, Add Mark, previous / count / next, Done */
+.rv-row .ql-formats { padding: 0 2px; }
+.rv-row { flex-basis: 100%; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; row-gap: 2px; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--sep); font-size: 12px; color: var(--text-2); }
+.rv-row[hidden] { display: none; }
+.ql-toolbar button.rv-ink { width: 16px; height: 16px; margin: 0 3px; padding: 0; border-radius: 50%; box-shadow: 0 0 0 1px var(--sep-strong, var(--sep)); }
+.ql-toolbar button.rv-ink, .ql-toolbar button.rv-ink:hover { background: var(--rv-ink); }
+.ql-toolbar button.rv-ink.on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--text-2); }
+.ql-toolbar button.rv-tb.wide { width: auto; padding: 0 7px 0 5px; gap: 4px; font-size: 12px; }
+.ql-toolbar button.rv-tb:disabled { opacity: .35; }
+.rv-count { padding: 0 4px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-3); }
+
+/* In the text: the strokes are drawn on each mark's own span (rv-mk), in that mark's ink (rv-ink-*) */
+.pm-rv-pt, .rv-badge { display: none; }
+.ql-container.rv-on .rv-mk { background: var(--rv-under) no-repeat 0 0 / 100% 100%; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.ql-container.rv-on .rv-mk[data-apply="delete"], .ql-container.rv-on .rv-mk[data-apply="replace"] { background-image: var(--rv-strike); }
+.ql-container.rv-on .rv-mk[data-apply="upper"] { background-image: var(--rv-triple); }
+.ql-container.rv-on .rv-mk[data-apply="bold"] { background-image: var(--rv-wavy); }
+.ql-container.rv-on .rv-mk[data-apply="lower"] { background-image: var(--rv-slash); }
+.ql-container.rv-on .rv-mk[data-apply="transpose"] { background-image: var(--rv-swoop); }
+.ql-container.rv-on .rv-mk[data-apply="closeup"] { background-image: var(--rv-close); }
+.ql-container.rv-on .rv-mk[data-apply="none"], .ql-container.rv-on .rv-mk[data-apply="roman"] { background-image: var(--rv-circle); padding: 0 .2em; margin: 0 -.05em; }
+.ql-container.rv-on .rv-mk[data-type="stet"] { background-image: var(--rv-dotted); padding: 0; margin: 0; }
+.ql-container.rv-on .pm-rv-pt { display: inline-block; position: relative; width: 0; height: 1em; vertical-align: baseline; }
+.ql-container.rv-on .pm-rv-pt::before { content: '^'; position: absolute; left: -.2em; bottom: -.7em; color: var(--rv-ink); font: 700 1.45em/1 'Lutefisk Hand', 'Segoe Print', 'Bradley Hand', cursive; transform: rotate(-4deg); pointer-events: none; }
+.ql-container.rv-on .rv-badge { display: inline-block; margin: 0 .2em 0 .18em; padding-right: .08em; white-space: nowrap; vertical-align: .5em; color: var(--rv-ink); font: 700 1.05em/1 'Lutefisk Hand', 'Segoe Print', 'Bradley Hand', cursive; letter-spacing: 0; text-indent: 0; text-decoration: none; transform: rotate(-5deg); transform-origin: left bottom; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.ql-container.rv-on .rv-badge:hover { opacity: .75; }
+.ql-container.rv-on .rv-badge.active { text-decoration: underline 1.5px; text-underline-offset: 2px; }
+
+/* Counts on the tools above the editor */
+.ed-badge { position: absolute; top: -3px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--text-3); color: #fff; font: 700 9.5px/15px var(--ui); text-align: center; pointer-events: none; box-shadow: 0 0 0 1.5px var(--paper); }
+/* Problems to look at are red (proofreader's marks, spelling, grammar); plain tallies are gray (characters, comments). */
+.ed-badge.spell, .ed-badge.grammar, .ed-badge.review { background: #d93036; }
+.ed-badge.cast, .ed-badge.comments { background: color-mix(in srgb, var(--text) 55%, var(--paper)); }
+.ed-tool.review-btn.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.ed-tool.review-btn.on svg { color: var(--rv-ink); }
+@media (forced-colors: active) { .ed-badge { forced-color-adjust: none; } }
+
+/* The Audit's proofreader's-mark chips: the margin abbreviations, by hand (not misspellings) */
+.au-chip.mark { background: none; color: var(--rv-red); text-decoration: none; font: 700 14px/1.1 'Lutefisk Hand', 'Segoe Print', cursive; padding: 0 4px; }
+
+/* Add Mark: a search box over every mark and the book's style-guide rules */
+.rv-find-box { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+.rv-find { width: 100%; box-sizing: border-box; }
+.rv-find-list { max-height: min(380px, 55vh); overflow-y: auto; display: flex; flex-direction: column; }
+.rv-find-head { padding: 7px 8px 3px; font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.rv-find-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 28px; padding: 2px 8px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font-size: 13px; text-align: left; cursor: default; }
+.rv-find-item.on { background: var(--accent); color: #fff; }
+.rv-find-abbr { flex: none; width: 3.6em; color: var(--rv-red); font: 700 16px/1 'Lutefisk Hand', 'Segoe Print', cursive; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-find-item.on .rv-find-abbr { color: #fff; }
+.rv-find-label { flex: 1; min-width: 0; }
+.rv-find-empty { padding: 14px 8px; color: var(--text-3); font-size: 12.5px; text-align: center; }
+
+.rv-row [hidden] { display: none !important; }
+
+/* Checkboxes (☐ ☑ in the text): drawn as a box to click in the editor; the book shows the characters. */
+.ql-editor .pm-check { display: inline-block; position: relative; width: .9em; height: .9em; margin: 0 .12em 0 .04em; vertical-align: -.1em; overflow: hidden; color: transparent; border: 1.5px solid var(--text-2); border-radius: 3px; box-sizing: border-box; cursor: pointer; user-select: none; -webkit-user-select: none; text-indent: 0; }
+.ql-editor .pm-check:hover { border-color: var(--accent); }
+.ql-editor .pm-check.on { background: var(--accent); border-color: var(--accent); }
+.ql-editor .pm-check.on::after { content: ''; position: absolute; left: 30%; top: 8%; width: 28%; height: 55%; border: solid #fff; border-width: 0 .14em .14em 0; transform: rotate(45deg); }

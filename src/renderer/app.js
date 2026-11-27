@@ -23,12 +23,14 @@ import { setDictionary, setRules, warmUp, setIgnored, ignoredList, unignore, pro
 import { openAudit, auditTally } from './audit.js';
 import { countMentions, newCharacter } from '../shared/characters.js';
 import { createCommentRail } from './comments.js';
+import { createReview } from './review.js';
 import { GROUPS, SECTION_TYPES, DEFAULT_CONTENT, defaultBook, ensureSections, newId, numberSections, aboutAuthorsLabel, syncAuthors } from '../shared/sections.js';
 import { renderSection, prepare, citer } from '../shared/bookhtml.js';
 import { TRIMS } from '../shared/print.js';
 import { joinScenes, splitAtBreaks, countBlocks, sceneSnippet, proseText } from '../shared/scenes.js';
 import { formatEntry, sortKey, entryFromUrl , localToday } from '../shared/citations.js';
-import { createMarkdown } from '../shared/markdown.js';
+import { createMarkdown, stripReview } from '../shared/markdown.js';
+import { reviewMarksIn } from '../shared/review.js';
 import { editSource } from './source-editor.js';
 import { openMathDialog } from './math-dialog.js';
 import { openSymbolPicker } from './symbol-picker.js';
@@ -443,6 +445,8 @@ function buildShell() {
   els.secSub.addEventListener('input', () => { const s = currentSection(); if (!s || currentScene()) return; if (els.secSub.value.trim()) s.subtitle = els.secSub.value; else delete s.subtitle; app.markDirty(); app.htmlCache?.clear?.(); schedulePreview(); });
   els.secSub.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); app.editor.focus(); } });
   els.commentsBtn = h('button', { class: 'ed-tool comments-btn', onclick: () => setCommentsHidden(!commentsHidden_()) });
+  // Review mode: proofreader's marks (on / off), with how many are open in the book.
+  els.reviewBtn = h('button', { class: 'ed-tool comments-btn review-btn', onclick: () => app.review?.toggle() });
   els.spellBtn = h('button', { class: 'ed-tool comments-btn proof-btn spell-btn', 'aria-label': 'Check spelling as you type', onclick: () => toggleLiveCheck('spell') });
   els.grammarBtn = h('button', { class: 'ed-tool comments-btn proof-btn grammar-btn', 'aria-label': 'Check grammar as you type', onclick: () => toggleLiveCheck('grammar') });
   // Story tools, top left of the editor: icons only; the hover tip names each one and says what it does.
@@ -451,10 +455,10 @@ function buildShell() {
   els.castBtn = toolBtn('tool-chars', 'people', 'Characters', 'Characters', () => openCast());
   els.castBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); castMenu(els.castBtn); });
   els.storyTools = h('div', { class: 'ed-tools', role: 'group', 'aria-label': 'Story tools' },
-    els.castBtn, els.commentsBtn, els.spellBtn, els.grammarBtn,
+    els.castBtn, els.commentsBtn, els.reviewBtn, els.spellBtn, els.grammarBtn,
     els.toolsBtn = toolBtn('tool-tools', 'wand', 'Tools', 'Tools', () => toolsMenu(els.toolsBtn)),
-    // Random Thoughts, right of Tools: all your thoughts, to add, edit or delete.
-    els.thoughtsBtn = toolBtn('tool-thoughts', 'thought', 'Random Thoughts', 'Random Thoughts', () => showThoughts()));
+    // Thoughts, right of Tools: all your thoughts, to add, edit or delete.
+    els.thoughtsBtn = toolBtn('tool-thoughts', 'thought', 'Thoughts', 'Thoughts', () => showThoughts()));
   els.headRow = h('span', { hidden: true }); // chapter heading style now lives in Book › Chapters and the templates
   els.chaptersBtn = h('button', { class: 'scene-btn chapters-menu', title: 'Chapters — go to any chapter or other part of the book', onclick: () => chapterJumpMenu(els.chaptersBtn) }, icon('toc', 15), h('span', {}, 'Chapters'), icon('chevron', 12));
   els.sceneBtn = h('button', { class: 'scene-btn scenes-menu', title: 'Scenes — split this chapter into scenes, add a scene, or go to one', onclick: () => sceneActions(els.sceneBtn) }, icon('scene', 15), els.sceneBtnLabel = h('span', {}, 'Scenes'), icon('chevron', 12));
@@ -568,7 +572,7 @@ function buildShell() {
   els.secTitle.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); app.editor.focus(); } });
 
   let railFrame = 0;
-  const railSoon = () => { cancelAnimationFrame(railFrame); railFrame = requestAnimationFrame(() => { app.comments?.selectionChanged(); app.comments?.update(); }); };
+  const railSoon = () => { cancelAnimationFrame(railFrame); railFrame = requestAnimationFrame(() => { app.comments?.selectionChanged(); app.comments?.update(); app.review?.update(); }); };
   // Spelling and grammar: Harper, on this computer. Spelling and grammar can each
   // run as you type (Settings › Spelling & Grammar); either can also be
   // checked on demand, which keeps its underlines until you move to other text.
@@ -598,6 +602,7 @@ function buildShell() {
       auto: () => liveKinds().size > 0,
       onLoad: () => { spellDemand.clear(); },
       onResult: () => {
+        drawCountsSoon();
         // Just switched on: say what the check found, without moving the cursor.
         if (spellReport) {
           const want = spellReport; spellReport = null;
@@ -627,7 +632,7 @@ function buildShell() {
       }
       safely(() => {
         if (tr.docChanged || tr.selectionSet) railSoon();
-        if (tr.docChanged) { app.goals.activity(); trackActivity(app.currentId); auditSoon(); }
+        if (tr.docChanged) { app.goals.activity(); trackActivity(app.currentId); auditSoon(); drawCountsSoon(); }
         if (writingFocus) requestAnimationFrame(() => app.editor.centerCaret());
         if (currentResearch()) { if (tr.docChanged) flushSerializeSoon(); updateStatusSoon(); }
       }, 'typing');
@@ -656,6 +661,21 @@ function buildShell() {
     createComment: (id, quote) => app.comments?.create(id, quote),
     commentsChanged: () => railSoon(),
     deleteComment: (id) => { app.comments?.remove(id); railSoon(); },
+    // Review mode (proofreader's marks): not in Research notes, which aren't part of the book.
+    review: {
+      on: () => !!app.review?.on() && !currentResearch(),
+      setOn: (v) => app.review?.setOn(v),
+      guide: () => app.review?.guide() || 'cmos',
+      setGuide: (g) => app.review?.setGuide(g),
+      info: (id) => app.review?.info(id),
+      create: (id, rec) => app.review?.create(id, rec),
+      finish: (id, accept, how) => app.review?.finish(id, accept, how),
+      editNote: (id) => app.review?.editNote(id),
+      clearHere: () => app.review?.clearHere(),
+      recolor: (ids, to) => app.review?.recolor(ids, to),
+      select: (id) => app.review?.select(id),
+      changed: () => { app.review?.update(); auditSoon(); },
+    },
     addIndexTerm: (term) => {
       app.book.index ||= { terms: [] };
       if (!app.book.index.terms.includes(term)) app.book.index.terms.push(term);
@@ -719,6 +739,11 @@ function buildShell() {
   });
   app.comments = createCommentRail(app, app.editor);
   app.comments.onCount = (open, all) => { commentCount = { open, all }; drawCommentsBtn(); };
+  app.review = createReview(app, {
+    onChange: () => drawReviewBtn(), available: () => !currentResearch(),
+    units: () => reviewUnits(), isOpen: (id) => isOpenText(id),
+    step: (dir) => reviewStep(dir), clearBook: () => clearBookReview(),
+  });
   { const load = app.editor.load.bind(app.editor); app.editor.load = (...a) => { const r = load(...a); railSoon(); return r; }; }
   window.addEventListener('resize', railSoon);
 
@@ -1100,9 +1125,8 @@ function drawCastBtn() {
   const b = els.castBtn;
   if (!b || !app.book) return;
   const n = (app.book.characters || []).length;
-  b.querySelector('.ed-badge')?.remove();
-  // The editor's tool icons are named by their label alone.
-  b.title = 'Characters';
+  setBadge(b, n, 'cast');
+  b.title = n ? `Characters — ${n} in the book` : 'Characters';
   // The cast changed (added, renamed, removed, another book): find the names again in the text.
   const sig = JSON.stringify((app.book.characters || []).map((c) => [c.id, c.name, c.aliases, c.color, c.matchFirst]));
   if (sig !== drawCastBtn.sig) { drawCastBtn.sig = sig; app.editor?.refreshCharacters?.(); }
@@ -1200,6 +1224,7 @@ function drawProofBtns() {
     const ic = kind === 'spell' ? (on ? 'spellAbc' : 'spellAbcOff') : (on ? 'grammar' : 'grammarOff');
     btn.replaceChildren(icon(ic, 16));
   }
+  drawCounts();
 }
 const GRAMMAR = () => ['grammar', ...(settings.spellStyle !== false ? ['style'] : [])];
 function liveKinds() { return new Set([...(settings.spellLive !== false ? ['spell'] : []), ...(settings.grammarLive !== false ? GRAMMAR() : [])]); }
@@ -1214,7 +1239,108 @@ function checkSpellingNow(what = 'both') {
   app.editor.checkSpellingNow();
 }
 
+/* ---- Counts on the tools above the editor: characters in the book; open comments, and possible
+   spelling and grammar problems, in the text that's open (each only while that check is on). */
+function setBadge(btn, n, kind) {
+  if (!btn) return;
+  let b = btn.querySelector(':scope > .ed-badge');
+  if (!n) { b?.remove(); return; }
+  if (!b) { b = h('span', { class: `ed-badge ${kind}`, 'aria-hidden': 'true' }); btn.append(b); }
+  b.textContent = n > 99 ? '99+' : String(n);
+}
+let countsFrame = 0, countsTimer = 0;
+function drawCountsSoon() { clearTimeout(countsTimer); countsTimer = setTimeout(() => { cancelAnimationFrame(countsFrame); countsFrame = requestAnimationFrame(drawCounts); }, 250); }
+function drawCounts() {
+  if (!app.book || !app.editor) return;
+  const text = !els.editorMount?.hidden;
+  const spellOn = settings.spellLive !== false || spellDemand.has('spell');
+  const gram = GRAMMAR();
+  const grammarOn = settings.grammarLive !== false || gram.some((k) => spellDemand.has(k));
+  const ns = text && spellOn ? app.editor.spellCount?.(new Set(['spell'])) || 0 : 0;
+  const ng = text && grammarOn ? app.editor.spellCount?.(new Set(gram)) || 0 : 0;
+  setBadge(els.spellBtn, ns, 'spell');
+  setBadge(els.grammarBtn, ng, 'grammar');
+  if (els.spellBtn) els.spellBtn.title = ns ? `Spelling — ${ns} possible problem${ns === 1 ? '' : 's'} here` : 'Spelling';
+  if (els.grammarBtn) els.grammarBtn.title = ng ? `Grammar — ${ng} possible problem${ng === 1 ? '' : 's'} here` : 'Grammar';
+  const nc = text ? commentCount.open : 0;
+  setBadge(els.commentsBtn, nc, 'comments');
+  if (els.commentsBtn) els.commentsBtn.title = nc ? `Comments — ${nc} open here` : 'Comments';
+}
+
+/* ---- Review mode: the chapters and scenes in book order, to go from mark to mark through the book */
+function reviewUnits() {
+  const out = [];
+  if (!app.book) return out;
+  for (const s of numberSections(app.book.sections, templateById(app.book.template), app.book)) {
+    if (SECTION_TYPES[s.type]?.generated) continue;
+    if (hasScenes(s)) for (const sc of s.scenes) out.push(sc.id); else out.push(s.id);
+  }
+  return out;
+}
+/** Is this chapter or scene the text in the editor (a scene of the open chapter counts)? */
+const isOpenText = (id) => id === app.currentId || (findScene(id)?.chapter.id === app.currentId);
+/** The next (1) or previous (-1) open mark: in this text first, then on through the book, round to the start. */
+function reviewStep(dir) {
+  if (app.editor.nextReview(dir, { wrap: false })) return;
+  flushSerialize();
+  const units = reviewUnits();
+  const n = units.length;
+  let i = units.findIndex((id) => isOpenText(id));
+  if (i < 0) i = dir > 0 ? -1 : n;
+  for (let k = 1; k <= n; k++) {
+    const id = units[(((i + dir * k) % n) + n) % n];
+    if (isOpenText(id)) {
+      if (app.editor.nextReview(dir)) return; // round the book and back here
+      continue;
+    }
+    if (!reviewMarksIn(app.contents[id]).length) continue;
+    selectSection(id);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const all = app.editor.reviewRanges();
+      if (all.length) app.editor.selectReview((dir > 0 ? all[0] : all.at(-1)).id);
+    }));
+    return;
+  }
+  toast('No open marks in the book', 'info', 1600);
+}
+/** Clear every mark in every chapter and scene that isn't open (the open text is cleared by the editor). */
+function clearBookReview() {
+  flushSerialize();
+  for (const id of reviewUnits()) {
+    if (isOpenText(id)) continue;
+    const md = app.contents[id];
+    if (!md || !md.includes('{%')) continue;
+    const out = stripReview(md);
+    if (out === md) continue;
+    app.contents[id] = out;
+    app.editor.forget(id);
+    app.dirtyFiles.add(id);
+    const sc = findScene(id);
+    if (sc && !isOpenText(sc.chapter.id)) rejoin(sc.chapter);
+  }
+  app.markDirty();
+  refreshSidebar();
+}
+
+/* ---- Review mode: the button lights up while it's on; its tip says how many marks are open */
+function drawReviewBtn() {
+  const b = els.reviewBtn;
+  if (!b) return;
+  b.hidden = !app.book || !!currentResearch?.();
+  if (b.hidden) return;
+  const onNow = !!app.review?.on();
+  const n = app.review?.bookCount() || 0;
+  b.classList.toggle('on', onNow);
+  b.classList.toggle('has-marks', n > 0);
+  b.setAttribute('aria-pressed', String(onNow));
+  b.title = `Proofreading${n ? ` — ${n} open mark${n === 1 ? '' : 's'} in the book` : ''}`;
+  b.setAttribute('aria-label', `${onNow ? 'Done proofreading' : 'Proofread'}${n ? `, ${n} open marks` : ''}`);
+  if (b.dataset.on !== String(onNow)) { b.dataset.on = String(onNow); b.replaceChildren(icon(onNow ? 'proof' : 'proofOff', 16)); }
+  setBadge(b, n, 'review');
+}
 function drawCommentsBtn() {
+  drawReviewBtn();
+  drawCountsSoon();
   if (!els.commentsBtn) return;
   const hiddenNow = commentsHidden_();
   els.commentsBtn.hidden = !app.book || !!currentResearch?.();
@@ -1341,7 +1467,7 @@ function refreshSidebar() {
       h('div', { class: 'sb-book-links' },
         settings.goalsOn !== false ? sideBtn('sb-goals', 'target', 'Goals', '', () => openGoals(app, app.goals, sheet), `Goals — book length, deadline countdown and daily goal${gc ? ` (${gc})` : ''}`) : null,
         sideBtn('sb-insights', 'chart', 'Insights', '', () => app.openInsights(), 'Insights — your book: words, readability, style, spelling and grammar'),
-        sideBtn('sb-research', 'research', 'Research', '', () => openResearchHub(), 'Research — your notes about the book (README.md), index cards, random thoughts, files, characters, plot and timeline. Never in the book.'),
+        sideBtn('sb-research', 'research', 'Research', '', () => openResearchHub(), 'Research — your notes about the book (README.md), index cards, thoughts, files, characters, plot and timeline. Never in the book.'),
         els.auditBtn))),
     h('div', { class: 'sb-searchrow' }, app.search.bar, filterBtn));
 
@@ -1475,7 +1601,7 @@ function drawBinBtn() {
   const n = app.book ? binCount(app.book) : 0;
   b.hidden = !app.book;
   b.classList.toggle('full', n > 0);
-  b.title = `Recycle Bin — ${n ? `${n} item${n === 1 ? '' : 's'}` : 'empty'}. Deleted chapters, scenes, index cards, random thoughts, characters and plot cards; restore them from here.`;
+  b.title = `Recycle Bin — ${n ? `${n} item${n === 1 ? '' : 's'}` : 'empty'}. Deleted chapters, scenes, index cards, thoughts, characters and plot cards; restore them from here.`;
   b.setAttribute('aria-label', `Recycle Bin${n ? `, ${n} item${n === 1 ? '' : 's'}` : ', empty'}`);
 }
 /** An Audit finding's button: go where it can be fixed. */
@@ -1499,6 +1625,11 @@ function auditGo(w) {
     case 'character': openCast(w.id, { keepPlace: true }); break;
     case 'characters': openCast(undefined, { keepPlace: true }); break;
     case 'comments': setCommentsHidden(false); break;
+    case 'review':
+      selectSection(w.id);
+      app.review?.setOn(true);
+      afterOpen(() => { if (w.mark && app.editor.selectReview(w.mark)) return; app.editor.nextReview(1); });
+      break;
     case 'section':
       selectSection(w.id);
       if (w.focusTitle) afterOpen(() => { if (!els.secTitle.hidden) els.secTitle.focus(); });
@@ -2197,7 +2328,7 @@ function binderCardItems(chapter, sceneIndex = null) {
   return [{ label: 'Add Card', icon: 'card', onClick: () => newCard({ from: noteWhere(id) }) }, '-'];
 }
 
-/* ---- Random Thoughts */
+/* ---- Thoughts */
 // Where the last right-click was, so the quick box opens right there.
 let lastMenuAt = null;
 document.addEventListener('contextmenu', (e) => { lastMenuAt = { x: e.clientX, y: e.clientY }; }, true);
@@ -2229,7 +2360,7 @@ function goThought(th) {
 function drawThoughtsBtn() {
   const b = els.thoughtsBtn;
   if (!b || !app.book) return;
-  b.title = 'Random Thoughts';
+  b.title = 'Thoughts';
 }
 
 /** ⌥⌘N: a new scene after the current one (or at the end of the chapter). */
@@ -2440,7 +2571,7 @@ function openChapterInsights(chapter) {
 /**
  * Research: the book's research/README.md — Markdown on the left (with buttons for common
  * formatting), a preview on the right — saved as you type and on Done/Esc. Its bar: Upload
- * Files…, Open Containing Folder, Index Cards, Random Thoughts, Bibliography; and Characters, Plot and Timeline. Uploaded files are listed
+ * Files…, Open Containing Folder, Index Cards, Thoughts, Bibliography; and Characters, Plot and Timeline. Uploaded files are listed
  * under the notes; pictures go into the notes as you upload them.
  */
 async function openResearchHub() {
@@ -2659,9 +2790,9 @@ async function openResearchHub() {
   const afterCard = () => { drawCardsBtn(); refreshSidebar(); };
   cardsBtn.addEventListener('click', () => openIndexCards({ onChange: afterCard }));
 
-  /* Random Thoughts: all of them, to add, edit or delete (the same as the bubble above the editor). */
-  const thoughtsLink = h('button', { type: 'button', class: 'cr-story', title: 'Random Thoughts — add, edit or delete your thoughts' });
-  const drawThoughtsLink = () => { const n = thoughtsOf(app.book).length; thoughtsLink.replaceChildren(...[icon('thought', 16), h('span', {}, 'Random Thoughts'), n ? h('span', { class: 'cr-count' }, String(n)) : null].filter(Boolean)); };
+  /* Thoughts: all of them, to add, edit or delete (the same as the bubble above the editor). */
+  const thoughtsLink = h('button', { type: 'button', class: 'cr-story', title: 'Thoughts — add, edit or delete your thoughts' });
+  const drawThoughtsLink = () => { const n = thoughtsOf(app.book).length; thoughtsLink.replaceChildren(...[icon('thought', 16), h('span', {}, 'Thoughts'), n ? h('span', { class: 'cr-count' }, String(n)) : null].filter(Boolean)); };
   drawThoughtsLink();
   thoughtsLink.addEventListener('click', () => openThoughts({ book: app.book, sheet, goTo: (th) => { closeHub?.(); goThought(th); }, markDirty: () => app.markDirty(), onChange: () => { drawThoughtsLink(); drawThoughtsBtn(); } }));
 
@@ -3584,6 +3715,7 @@ B.onMenu(async (cmd) => {
     case 'content-search': return app.book && focusSearch();
     case 'find-replace': if (app.book) { focusSearch(); app.search.replace(); } return undefined;
     case 'toggle-comments': return app.book && setCommentsHidden(!commentsHidden_());
+    case 'toggle-review': return app.book && !currentResearch() && app.review?.toggle();
     case 'focus-mode': return app.book && toggleWritingFocus();
     case 'open-settings': return openSettings(sheet);
     case 'backup-book': return app.backupBook();

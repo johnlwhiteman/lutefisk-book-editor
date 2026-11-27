@@ -6,7 +6,7 @@ import { setCustomTemplates } from '../shared/templates.js';
 import { coverAlt } from '../shared/cover.js';
 import YAML from 'yaml';
 import { prepare, indexLocations, citer } from '../shared/bookhtml.js';
-import { extractFootnotes, stripComments, safeAssetPath } from '../shared/markdown.js';
+import { extractFootnotes, stripComments, stripReview, safeAssetPath } from '../shared/markdown.js';
 import { fillPlaceholders } from '../shared/sections.js';
 import { formatBibliography, citationOrder, listHeading } from '../shared/citations.js';
 
@@ -67,7 +67,7 @@ export async function buildMarkdown({ book, contents, assetsFolder }) {
         continue; // footnotes stay attached to their chapters in Markdown
       default: break;
     }
-    const { body, defs } = extractFootnotes(stripComments(fillPlaceholders(contents[s.id] || '', book)));
+    const { body, defs } = extractFootnotes(stripReview(stripComments(fillPlaceholders(contents[s.id] || '', book))));
     const prefix = s.id.replace(/[^a-z0-9]/g, '');
     let text = body
       .replace(/\[@([A-Za-z0-9_-]{1,64})(?:,\s*([^\]\n]{1,60}))?\]/g, (_m, ref, loc) => cite(ref, (loc || '').trim()))

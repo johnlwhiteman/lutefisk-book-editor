@@ -105,6 +105,8 @@ function collect(doc) {
         if (child.marks.some((m) => m.type.name === 'code')) { for (let i = 0; i < [...child.text].length; i++) { text += ' '; pos.push(-1); } return; }
         let k = 0;
         for (const ch of child.text) { text += ch; pos.push(p + k); k += ch.length; }
+      } else if (child.type.name === 'review_point') {
+        // A proofreader's caret (Review mode) isn't text: “walk‸ed” is still one word.
       } else { text += '￼'; pos.push(p); }
     });
     return false;

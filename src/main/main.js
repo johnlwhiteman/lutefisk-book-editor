@@ -27,6 +27,9 @@ import { buildMobi } from './export-mobi.js';
 import * as researchFolder from './research-folder.js';
 import { lookupSource } from './source-lookup.js';
 import { zip as zipAsync } from 'fflate';
+import { gunzip } from 'node:zlib';
+import { promisify } from 'node:util';
+const gunzipAsync = promisify(gunzip);
 import { texToMathml } from '../shared/math.js';
 import { t, setLanguage, LANGUAGE_CODES } from '../shared/i18n.js';
 import { cleanPreset } from '../shared/goal-presets.js';
@@ -160,7 +163,11 @@ function registerProtocols() {
     let file;
     try { file = within(APP_ROOT, rel); } catch { return new Response('Forbidden', { status: 403 }); }
     try {
-      const body = await fs.readFile(file);
+      // Large files ship gzipped (file.gz) to keep the app small; they're served unpacked, byte for byte.
+      const body = await fs.readFile(file).catch(async (err) => {
+        if (err?.code !== 'ENOENT') throw err;
+        return gunzipAsync(await fs.readFile(`${file}.gz`));
+      });
       const headers = { 'content-type': mimeFor(file), 'x-content-type-options': 'nosniff' };
       if (file.endsWith('.html')) headers['content-security-policy'] = CSP;
       return new Response(body, { headers });
@@ -425,6 +432,7 @@ function buildMenu() {
         { label: t('Check Spelling and Grammar (F7)'), click: send('spell-check') },
         { label: t('Audit Book…'), click: send('audit-book') },
         { label: t('Show / Hide Comments'), accelerator: 'CmdOrCtrl+Alt+C', click: send('toggle-comments') },
+        { label: t('Proofreading'), accelerator: 'CmdOrCtrl+Alt+R', click: send('toggle-review') },
         { label: t('Toggle Sidebar'), accelerator: MAC ? 'Cmd+Ctrl+S' : 'Ctrl+Shift+B', click: send('toggle-sidebar') },
         { type: 'separator' }, { role: 'togglefullscreen' },
         ...(isDev ? [{ role: 'toggleDevTools' }] : []),

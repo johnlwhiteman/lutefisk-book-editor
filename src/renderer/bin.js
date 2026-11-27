@@ -15,7 +15,7 @@ export const BIN_KINDS = {
   todo: { label: 'To-do', icon: 'checklist' },
   character: { label: 'Character', icon: 'people' },
   card: { label: 'Plot card', icon: 'plot' },
-  thought: { label: 'Random thought', icon: 'thought' },
+  thought: { label: 'Thought', icon: 'thought' },
 };
 
 /** Put a deleted thing in the book's Recycle Bin. texts: { id: markdown } for anything with a file. */

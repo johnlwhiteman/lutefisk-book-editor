@@ -31,7 +31,7 @@ const TOPICS = [
     body: () => [
       cards(
         card('binder', 'Binder', 'Your book’s parts, top to bottom: covers, front matter, chapters, back matter. Drag any of them to put it in a new place within its part; double-click any name to rename it. Click the cover for Book settings.'),
-        card('pen', 'Editor', 'Where you write. The icons above it are Characters, Comments, Spelling, Grammar, Tools and Random Thoughts.'),
+        card('pen', 'Editor', 'Where you write. The icons above it are Characters, Comments, Proofreading, Spelling, Grammar, Tools and Thoughts.'),
         card('device', 'Preview', 'Your book on a phone, tablet or e-reader — or in print. Change its design with the template button.'),
         card('columns', 'Panels', 'The panels button in the title bar puts them in any order. Each pane hides with the button at its top right.')),
     ],
@@ -41,9 +41,27 @@ const TOPICS = [
     body: () => [
       cards(
         card('textStyle', 'Formatting', 'The toolbar above the text: styles, bold and italic, lists, links, pictures, tables and more.'),
-        card('person', 'Right-click', 'Comments, index cards, Random Thoughts, footnotes, breaks, scenes and more — right where you are.'),
+        card('checklist', 'Checkboxes', B('+'), ' › ', B('Checkbox'), ', or type ', B('[ ]'), ' and a space at the start of a line. Click a box to check or uncheck it. The book shows ☐ and ☑.'),
+        card('person', 'Right-click', 'Comments, index cards, Thoughts, footnotes, breaks, scenes and more — right where you are.'),
         card('spell', 'Spelling and grammar', 'Problems are underlined as you type. Right-click one for suggestions. ', KEY('F7'), ' checks now.'),
         card('search', 'Search', KEY('⌘F'), ' searches the whole book; ', KEY('⇧⌘H'), ' replaces.')),
+    ],
+  },
+  {
+    id: 'review', icon: 'proof', title: 'Proofreading', blurb: 'Mark up the manuscript by hand.',
+    body: () => [
+      lede('Mark up your manuscript the way an editor would — proofreader’s marks written over the text by hand in red, blue, green or purple ink. The text doesn’t change, and the marks show only in the editor.'),
+      steps(
+        ['Start.', 'Click the pencil above the editor (', KEY('⌥⌘R'), '). A row opens under the toolbar. Proofreading is off each time Lutefisk opens.'],
+        ['Choose a style.', 'In ', B('Book settings › Style'), ': ', B('The Chicago Manual of Style'), ', ', B('AP Stylebook'), ' or ', B('APA Style'), '. Its own rules (serial commas, numbers, dashes, titles, percent) appear in Add Mark. The bibliography style is there too.'],
+        ['Mark the text.', 'Select some text, or put the cursor where something is missing, then ', B('Add Mark'), ' and type to search — “comma”, “cap”, “del” — and press Return. Or right-click › ', B('Proofreader’s Marks'), ', also in the ', B('+'), ' menu.'],
+        ['Go through them.', B('‹ ›'), ' step through the marks in this chapter or scene first, then on through the book.'],
+        ['Finish.', 'Click the pencil again, or ', B('Done'), '. The marks stay, hidden, until you clear them: right-click › Proofreader’s Marks › ', B('Clear Marks Here'), ', or ', B('Clear All Marks'), ' in Book settings › Style.']),
+      cards(
+        card('palette', 'Red, blue, green or purple', 'Pick the ink in the row — red to start with. Marks keep the ink they were made in, so two reviewers can use two colors. Highlight marks (or click a mark’s label) and click an ink to change their color. The palette beside the inks makes every mark one color; right-click a mark › Color changes just that one.'),
+        card('eye', 'Only in the editor', 'Marks never appear in the previews, the print PDF or any export.'),
+        card('audit', 'Counted in the Audit', 'Open marks are listed in the Book Audit under Proofreader’s marks, and count until they’re cleared.'),
+        card('person', 'One mark at a time', 'Right-click a mark to remove it, add a note, or — for changes like delete, cap or insert — make the change.')),
     ],
   },
   {
@@ -51,7 +69,7 @@ const TOPICS = [
     body: () => [
       cards(
         card('people', 'Characters', 'A card for everyone in your story. Their names get light green stripes in your text (“Mark names in editor” at the top of the Characters window) — point at one to open them.'),
-        card('thought', 'Random Thoughts', 'Right-click in your text › ', B('Add Random Thought'), ' to jot one down — it can keep where you were and the text you’d highlighted. The thought bubble above the editor — or Random Thoughts in Research — shows them all to add, edit or delete.'),
+        card('thought', 'Thoughts', 'Right-click in your text › ', B('Add Thought'), ' to jot one down — it can keep where you were and the text you’d highlighted. The thought bubble above the editor — or Thoughts in Research — shows them all to add, edit or delete.'),
         card('card', 'Index cards', 'Right-click in your text › ', B('Add Card'), ' to keep a passage with a note. Research › ', B('Index Cards'), ' lays them all out.'),
         card('plot', 'Plot and timeline', 'Plan the story on a board of cards, and see it in the order things happen.'),
         card('research', 'Research', 'Notes and files about the book. Never part of the book itself.')),
@@ -81,7 +99,7 @@ const TOPICS = [
     body: () => [
       h('table', { class: 'help-keys' }, ...[
         ['New chapter / New scene', '⇧⌘N / ⌥⌘N'], ['Search / Replace', '⌘F / ⇧⌘H'], ['Bold / Italic', '⌘B / ⌘I'],
-        ['Comment', '⌃⌥M'], ['Check spelling', 'F7'], ['Focus on writing', '⇧⌘F'], ['Back up', '⇧⌘S'], ['Help', 'F1'],
+        ['Comment', '⌃⌥M'], ['Proofreading', '⌥⌘R'], ['Check spelling', 'F7'], ['Focus on writing', '⇧⌘F'], ['Back up', '⇧⌘S'], ['Help', 'F1'],
       ].map(([a, b]) => h('tr', {}, h('td', {}, a), h('td', {}, KEY(b))))),
       h('p', { class: 'hint' }, 'On Windows and Linux, use Ctrl for ⌘ and Alt for ⌥.'),
     ],
@@ -155,7 +173,7 @@ const BOOK_STEPS = [
   { sel: '.sb-book', title: 'Your book', text: 'Click the cover for Book settings. Goals, Insights, Research and Audit sit beside it.' },
   { sel: '.sidebar .sb-scroll', title: 'The binder', text: 'Every part of your book. Click to open, drag to reorder, right-click for more.' },
   { sel: '.ql-container', title: 'Write', text: 'Type here. Everything saves as you go.' },
-  { sel: '.ed-tools', title: 'Story tools', text: 'Characters, comments, spelling, grammar, tools and Random Thoughts. Point at an icon for its name.' },
+  { sel: '.ed-tools', title: 'Story tools', text: 'Characters, comments, proofreading, spelling, grammar, tools and Thoughts. Point at an icon for its name.' },
   { sel: '.pv-bar', title: 'Preview', text: 'Pick a device and a design; the book updates as you go.' },
   { sel: '.export-btn', title: 'Export', text: 'EPUB, PDF, Word and more — when you’re ready.' },
   { sel: '.tb-help', title: 'Help any time', text: 'Click ? or press F1.' },

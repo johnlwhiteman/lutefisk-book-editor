@@ -12,17 +12,20 @@ Lutefisk Book Editor puts your manuscript and the finished book side by side. Yo
 
 ## Features
 
-| | |
-|---|---|
-| **Write** | Paragraph styles, text color, highlighting, lists, tables, pictures, drawings, LaTeX formulas, code, footnotes, citations and margin comments |
-| **Organize** | A binder with numbered chapters and scenes, front and back matter, labels, statuses, search and replace, and a Recycle Bin |
-| **Check** | Spelling, grammar and style checked as you type, on your computer, with your own dictionary and rules you choose |
-| **Preview** | Kindle, Kobo, Nook, iPhone, iPad and Android devices drawn to scale, and the printed book as an open spread |
-| **Design** | About 95 templates, drop caps, ornaments, trim sizes, artwork papers and a watermark |
-| **Plan** | Research notes and files, index cards, a bibliography in four citation styles, characters, a plot board and a timeline |
-| **Track** | Goals your way (or none at all), the routines of famous writers, a writing history and Insights |
-| **Make it yours** | Twelve skins, text size up to 200%, four levels of contrast and 16 interface languages |
-| **Export** | EPUB 3, PDF, Word (.docx), RTF, MOBI, Markdown and plain text |
+- **Write** — paragraph styles, bold/italic/underline, text color, highlighter, lists, checkboxes, tables, pictures, drawings, LaTeX formulas, code blocks, footnotes, citations and symbols
+- **Organize** — a binder of numbered chapters and scenes, front and back matter in any order, labels, statuses, and a Recycle Bin
+- **Find** — search the whole book, find and replace
+- **Check** — spelling, grammar and style as you type, on your computer, with your own dictionary and rules (counts on the Spelling and Grammar buttons)
+- **Comment** — Word-style margin comments with replies (count on the Comments button)
+- **Proofread** — proofreader’s marks written over the text by hand in red, blue, green or purple ink, searchable, following Chicago, AP or APA style; step through them chapter by chapter, clear them when done — editor only, never exported
+- **Audit** — one check before you publish: titles, author, covers, copyright, empty chapters, notes to self, image descriptions, open comments and proofreader’s marks, spelling and grammar
+- **Preview** — Kindle, Kobo, Nook, iPhone, iPad and Android drawn to scale, and the printed book as an open spread
+- **Design** — about 95 templates, drop caps, ornaments, trim sizes, artwork papers and a watermark
+- **Plan** — characters (count on the Characters button), a plot board, a story timeline, index cards, Thoughts, research notes and files, and a bibliography in four citation styles (chosen in Book settings › Style)
+- **Track** — goals your way (or none at all), the routines of famous writers, a writing history and Insights
+- **Make it yours** — twelve skins, day and night, text size up to 200%, four levels of contrast and 16 interface languages
+- **Export** — EPUB 3, PDF, Word (.docx), RTF, MOBI, Markdown and plain text
+- **Private** — everything stays on your computer; nothing is sent anywhere
 
 ## A tour
 
@@ -36,7 +39,7 @@ The binder keeps **Front Matter**, **Body** and **Back Matter** on separate card
 
 ### Write
 
-The toolbar has paragraph styles (headings, block quote, verse, hanging indent, attribution), bold, italic and underline, text color, a highlighter and alignment. The **+** menu inserts links, pictures, lists, tables, code, formulas, symbols, drawings, citations, footnotes, line breaks and scene breaks. Right-click the toolbar to move it below the text.
+The toolbar has paragraph styles (headings, block quote, verse, hanging indent, attribution), bold, italic and underline, text color, a highlighter and alignment. The **+** menu inserts links, pictures, lists, tables, code, formulas, symbols, drawings, citations, footnotes, checkboxes, line breaks and scene breaks. Click a checkbox to check or uncheck it, or type `[ ]` and a space at the start of a line to make one. Right-click the toolbar to move it below the text.
 
 ![The formatting toolbar below the text](docs/screenshots/toolbar-bottom.png)
 
@@ -49,6 +52,14 @@ Right-click in the text for comments, index cards and characters, and the same *
 Problems are highlighted as you type: spelling in red, grammar in blue and style in purple. Right-click a highlighted word for suggestions, **Add to Dictionary** or **Ignore**. The **Spelling** and **Grammar** buttons above the text turn checking on and off. In **Settings › Spelling & Grammar**, choose American, British, Canadian or Australian English, edit **your dictionary** (add, find, correct or remove words), and **choose the rules** the checker uses: turn whole groups on or off, such as Style and Redundancy or Word Choice, or single rules like the Oxford comma or avoiding contractions.
 
 <p align="center"><img src="docs/screenshots/live.png" alt="Spelling and grammar highlighted in the text" width="470"></p>
+
+### Proofread
+
+Click the pencil above the editor (**⌥⌘R**) and mark up the manuscript the way an editor would: proofreader’s marks written over the text by hand, in red, blue, green or purple ink. Select some text (or put the cursor where something is missing), then **Add Mark** and type to search — *del*, *comma*, *cap*, *serial* — or right-click › **Proofreader’s Marks**. Each mark keeps its ink, so two reviewers can use two colors; the palette makes every mark one color. **‹ ›** step through the marks in this chapter, then on through the book. The text doesn’t change, and the marks never appear in the preview or any export — they stay, counted in the **Audit**, until you clear them. Choose **The Chicago Manual of Style**, **AP Stylebook** or **APA Style** in **Book settings › Style**; its own rules (serial commas, numbers, dashes, titles) are in the menu.
+
+![Proofreader’s marks in four inks; the preview shows the text as written](docs/screenshots/proofreading.png)
+
+<p align="center"><img src="docs/screenshots/proofreading-search.png" alt="Add Mark: searching the marks for “comma”" width="468"></p>
 
 ### Insert code
 

@@ -6,7 +6,7 @@
 import { packager } from '@electron/packager';
 import { flipFuses, FuseVersion, FuseV1Options } from '@electron/fuses';
 import { join } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').split('=')[1] || d;
 const platform = arg('platform', process.platform);
@@ -35,6 +35,16 @@ const paths = await packager({
   win32metadata: { CompanyName: 'Lutefisk Book Editor', FileDescription: 'Lutefisk Book Editor', ProductName: 'Lutefisk Book Editor' },
   extendInfo: { NSHumanReadableCopyright: 'Lutefisk Book Editor' },
 });
+
+// Chromium's own interface languages: keep English and the app's interface languages (others fall back to
+// English, as the app's own interface does). About 5 MB smaller. Not on macOS, where they're inside the
+// signed Electron framework.
+const KEEP_LOCALES = new Set(['en-US', 'en-GB', 'de', 'fr', 'it', 'es', 'es-419', 'pl', 'ru', 'uk', 'id', 'ms', 'vi', 'ja', 'zh-CN', 'zh-TW', 'ko']);
+for (const out of paths) {
+  const dir = join(out, 'locales');
+  if (platform === 'darwin' || !existsSync(dir)) continue;
+  for (const f of readdirSync(dir)) if (f.endsWith('.pak') && !KEEP_LOCALES.has(f.slice(0, -4))) rmSync(join(dir, f));
+}
 
 for (const out of paths) {
   const exe = platform === 'darwin' ? join(out, `${pkg.productName}.app`)

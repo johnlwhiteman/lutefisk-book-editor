@@ -1,6 +1,6 @@
-# Lutefisk 1.0.0 — Software Bill of Materials
+# Lutefisk Book Editor 1.0.0 — Software Bill of Materials
 
-Generated 2026-11-15T17:10:38.261Z with `npm sbom` (npm 10.9.9).
+Generated 2026-11-27T05:27:03.059Z with `npm sbom` (npm 10.9.9).
 
 Machine-readable files:
 
@@ -11,12 +11,13 @@ Embedded runtime: **Electron 45.2.3** (Chromium + Node.js), downloaded from the 
 
 `npm audit`: info 0, low 0, moderate 0, high 0, critical 0, total 0.
 
-## Shipped in the application (70)
+## Shipped in the application (71)
 
 | Package | Version | License |
 |---|---|---|
 | @fontsource/alegreya | 5.3.0 | OFL-1.1 |
 | @fontsource/atkinson-hyperlegible | 5.3.0 | OFL-1.1 |
+| @fontsource/caveat | 5.3.0 | OFL-1.1 |
 | @fontsource/cinzel | 5.3.0 | OFL-1.1 |
 | @fontsource/cormorant-garamond | 5.3.0 | OFL-1.1 |
 | @fontsource/courier-prime | 5.3.0 | OFL-1.1 |

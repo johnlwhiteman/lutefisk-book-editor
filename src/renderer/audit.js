@@ -12,6 +12,7 @@ import { joinScenes, proseText } from '../shared/scenes.js';
 import { templateById } from '../shared/templates.js';
 import { mentionRegex } from '../shared/characters.js';
 import { suggestNames } from './characters.js';
+import { reviewMarksIn, markType } from '../shared/review.js';
 
 const SEVERITY = {
   error: { label: 'Problem — will show wrong in the book', icon: 'warn' },
@@ -30,6 +31,7 @@ const GROUP_ORDER = [
   ['characters', 'Characters', 'people'],
   ['text', 'In the text', 'pen'],
   ['comments', 'Open comments', 'comment'],
+  ['review', 'Proofreader’s marks', 'proof'],
   ['proof', 'Spelling and grammar', 'spellAbc'],
 ];
 
@@ -180,6 +182,24 @@ export function auditBook({ book, contents }) {
       where: { kind: 'section', id: u.id }, closeComment: cid });
   }
   if (!openN) ok('comments', 'No open comments');
+
+  /* ---- proofreader's marks (Proofreading): each chapter or scene with open marks. They can't be
+     ignored — they count until they're cleared. */
+  let marksN = 0;
+  const recs = book.review?.marks || {};
+  for (const u of units) {
+    const ms = reviewMarksIn(u.md);
+    if (!ms.length) continue;
+    marksN += ms.length;
+    const kinds = [...new Set(ms.map((m) => markType(m.type).abbr))];
+    const who = [...new Set(ms.map((m) => recs[m.id]?.author).filter(Boolean))];
+    const asks = ms.filter((m) => m.type === 'query' || recs[m.id]?.note).length;
+    add({ id: `review-${u.id}`, group: 'review', sev: 'warn', noIgnore: true, title: `${clip(u.name, 48)}: ${plural(ms.length, 'open proofreader’s mark')}`,
+      chips: kinds.slice(0, 8), more: Math.max(0, kinds.length - 8),
+      detail: [asks ? `${plural(asks, 'note')} for the author` : '', who.length ? `from ${clip(who.join(', '), 50)}` : '', 'Clear them in Proofreading when you’re done'].filter(Boolean).join(' · '),
+      where: { kind: 'review', id: u.id, mark: ms[0].id } });
+  }
+  if (!marksN) ok('review', 'No open proofreader’s marks');
 
   /* ---- characters: everyone in your cast is found in the text, and the names that keep
      coming up in the text are in your cast */
@@ -406,16 +426,16 @@ export function openAudit(ctx) {
 
   function row(f) {
     const isIgnored = ignored().has(f.id);
-    const label = f.where ? ({ settings: f.where.tab === 'cover' ? 'Open Covers' : 'Open Details', enable: 'Add', section: 'Go to It', find: 'Show Me', proof: 'Review', comments: 'Show', 'add-chapter': 'Add Chapter', character: 'Open', characters: 'Open Characters' }[f.where.kind] || 'Go') : null;
+    const label = f.where ? ({ settings: f.where.tab === 'cover' ? 'Open Covers' : 'Open Details', enable: 'Add', section: 'Go to It', find: 'Show Me', proof: 'Review', review: 'Review', comments: 'Show', 'add-chapter': 'Add Chapter', character: 'Open', characters: 'Open Characters' }[f.where.kind] || 'Go') : null;
     return h('li', { class: `au-item ${f.sev}${isIgnored ? ' ignored' : ''}` },
       h('span', { class: `au-ic ${f.sev}`, title: SEVERITY[f.sev].label }, icon(SEVERITY[f.sev].icon, 13)),
       h('div', { class: 'au-txt' },
         h('div', { class: 'au-title' }, h('b', {}, f.title), h('span', { class: `au-tag ${f.sev}`, title: SEVERITY[f.sev].label }, TAG[f.sev])),
         f.sub ? h('span', { class: 'au-sub' }, f.sub) : null,
-        f.chips?.length ? h('div', { class: 'au-chips' }, ...f.chips.map((w) => h('span', { class: `au-chip${f.group === 'characters' ? ' name' : ''}` }, w)), f.more ? h('span', { class: 'au-chip more' }, `+${f.more}`) : null) : null,
+        f.chips?.length ? h('div', { class: 'au-chips' }, ...f.chips.map((w) => h('span', { class: `au-chip${f.group === 'characters' ? ' name' : f.group === 'review' ? ' mark' : ''}` }, w)), f.more ? h('span', { class: 'au-chip more' }, `+${f.more}`) : null) : null,
         f.detail ? h('small', {}, f.detail) : null),
       h('div', { class: 'au-acts' },
-        isIgnored
+        f.noIgnore && !isIgnored ? null : isIgnored
           ? h('button', { type: 'button', class: 'au-act', title: 'Count this again', onclick: () => setIgnored(f.id, false) }, icon('eye', 13), 'Restore')
           : h('button', { type: 'button', class: 'au-act au-ignore', title: 'Ignore — it’s fine as it is. It moves to Ignored and stays out of the count.', onclick: () => setIgnored(f.id, true) }, icon('eyeOff', 13), 'Ignore'),
         f.closeComment && !isIgnored && ctx.closeComments ? h('button', { type: 'button', class: 'au-act au-close', title: 'Close this comment (you can reopen it in the comment margin)', onclick: () => askClose([f.closeComment]) }, icon('check', 13), 'Close') : null,

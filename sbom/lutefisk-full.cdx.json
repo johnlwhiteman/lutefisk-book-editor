@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:5d12e752-5966-4cbc-b09e-76bd90773871",
+  "serialNumber": "urn:uuid:ca8b89ad-60fe-4439-a430-b2022ef9e293",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-15T17:10:37.460Z",
+    "timestamp": "2026-11-27T05:27:02.231Z",
     "lifecycles": [
       {
         "phase": "build"
@@ -19,13 +19,13 @@
       }
     ],
     "component": {
-      "bom-ref": "lutefisk@1.0.0",
+      "bom-ref": "lutefisk-book-editor@1.0.0",
       "type": "application",
-      "name": "bindery",
+      "name": "lutefisk-book-editor",
       "version": "1.0.0",
       "scope": "required",
       "description": "Local-first book writing and formatting studio with live device previews.",
-      "purl": "pkg:npm/lutefisk@1.0.0",
+      "purl": "pkg:npm/lutefisk-book-editor@1.0.0",
       "properties": [
         {
           "name": "cdx:npm:package:path",
@@ -36,7 +36,20 @@
           "value": "true"
         }
       ],
-      "externalReferences": [],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/johnlwhiteman/lutefisk-book-editor.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/johnlwhiteman/lutefisk-book-editor#readme"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/johnlwhiteman/lutefisk-book-editor/issues"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -638,6 +651,53 @@
         {
           "alg": "SHA-512",
           "content": "4a9f157bcfab42610d6362efd36547eec2e99edcd34ef9e772724c4db444ec35fa4cbc46ada378ca465fcda51622808599aa26c24bcd8aa9a53e4aca06e0e848"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "@fontsource/caveat@5.3.0",
+      "type": "library",
+      "name": "@fontsource/caveat",
+      "version": "5.3.0",
+      "scope": "required",
+      "author": "Google Inc.",
+      "description": "Self-host the Caveat font in a neatly bundled NPM package.",
+      "purl": "pkg:npm/%40fontsource/caveat@5.3.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@fontsource/caveat"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@fontsource/caveat/-/caveat-5.3.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/fontsource/font-files.git"
+        },
+        {
+          "type": "website",
+          "url": "https://fontsource.org/fonts/caveat"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/fontsource/font-files/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7874dfcd0c45496f400444512cdaee1e834998a79dd89ee9a9351ce65a786b83ce3205c62a9c665a3dddf47cf5d2498083a8ae4d32dee946a06c0e1b9ec99f43"
         }
       ],
       "licenses": [
@@ -6023,10 +6083,11 @@
   ],
   "dependencies": [
     {
-      "ref": "lutefisk@1.0.0",
+      "ref": "lutefisk-book-editor@1.0.0",
       "dependsOn": [
         "@fontsource/alegreya@5.3.0",
         "@fontsource/atkinson-hyperlegible@5.3.0",
+        "@fontsource/caveat@5.3.0",
         "@fontsource/cinzel@5.3.0",
         "@fontsource/cormorant-garamond@5.3.0",
         "@fontsource/courier-prime@5.3.0",
@@ -6171,6 +6232,10 @@
     },
     {
       "ref": "@fontsource/atkinson-hyperlegible@5.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "@fontsource/caveat@5.3.0",
       "dependsOn": []
     },
     {

@@ -19,6 +19,7 @@ import { coverOpts, coverAlt, coverImgCss, COVER_EXTENTS, COVER_VALIGNS } from '
 import { GENRES, ALL_GENRES, cleanGenre } from '../shared/genres.js';
 import { BLOCK_BG, MATH_BORDERS, blockStyles } from '../shared/blockstyle.js';
 import { settings, updateSettings } from './settings.js';
+import { GUIDES as PROOF_GUIDES, DEFAULT_GUIDE } from '../shared/review.js';
 
 /* ------------------------------------------------------------ helpers */
 /**
@@ -308,6 +309,35 @@ export function openBookSettings(app, initialTab = 'general', { focus } = {}) {
       })(),
       field('Headings', select(b, 'headingCase', [['template', 'As the template designs them'], ['normal', 'Normal case — no capitals styling']], ch), 'Some templates set chapter numbers and titles in capitals or small capitals.'),
       field('Footnotes', select(b, 'notesPlacement', [['chapter', 'End of each chapter (pop-ups in e-books)'], ['book', 'Collected in an Endnotes section']], () => { if (b.notesPlacement === 'book') app.enableSection('endnotes'); ch(); }))),
+    // Style: how citations and the bibliography are written, and the style guide for proofreading.
+    style: () => {
+      const cite = h('select', { 'aria-label': 'Citation and bibliography style' }, STYLES.map((st) => h('option', { value: st.id }, st.label)));
+      cite.value = b.citationStyle || 'apa';
+      cite.addEventListener('change', async () => {
+        const st = STYLES.find((x) => x.id === cite.value);
+        const ok = await dialog({ title: `Change the book to ${st.label}?`,
+          message: `Every citation in your text and every entry in your bibliography will change to ${st.label}, in the preview and in every export.${st.id === 'ieee' ? ' In-text citations become numbers like [1], in the order sources are first cited.' : ''}`,
+          ok: `Change to ${st.label.replace(/ \(.*\)$/, '')}` });
+        if (!ok) { cite.value = b.citationStyle || 'apa'; return; }
+        b.citationStyle = st.id;
+        app.editor?.redraw?.();
+        ch();
+        toast(`Every citation and reference is now in ${st.label}`, 'ok', 2400);
+      });
+      const proof = h('select', { 'aria-label': 'Proofreading style' }, Object.values(PROOF_GUIDES).map((g) => h('option', { value: g.id }, g.name)));
+      proof.value = PROOF_GUIDES[b.review?.guide] ? b.review.guide : DEFAULT_GUIDE;
+      proof.addEventListener('change', () => { if (app.review) app.review.setGuide(proof.value); else (b.review ||= {}).guide = proof.value; app.markDirty(); });
+      const n = () => app.review?.bookCount?.() || 0;
+      const count = h('span', { class: 'hint' });
+      const clearBtn = h('button', { type: 'button', class: 'btn small', onclick: async () => { await app.review?.clearBook(); draw(); } }, 'Clear All Marks…');
+      const draw = () => { const k = n(); count.textContent = k ? `${k} open in the book` : 'None in the book'; clearBtn.disabled = !k; };
+      draw();
+      return h('div', { class: 'form-grid' },
+        field('Citations and bibliography', cite, 'How citations in your text and the entries in your bibliography are written — in the preview and every export.'),
+        field('Proofreading style', proof, 'The style guide for proofreader’s marks. Its own rules — serial commas, numbers, dashes, titles, percent — appear in Add Mark.'),
+        h('div', { class: 'fld' }, h('span', {}, 'Proofreader’s marks'), h('div', { class: 'row-inline' }, clearBtn, count),
+          h('small', { class: 'hint' }, 'Clears every mark in every chapter and scene. The text stays as written.')));
+    },
     print: () => h('div', { class: 'form-grid' },
       field('Trim size', select(b.print, 'trim', Object.entries(TRIMS).map(([k, t]) => [k, t.label]), ch)),
       toggle(b.print, 'startRecto', 'Chapters start on right-hand pages', 'Inserts blank pages where needed, like a traditionally printed book.', ch),
@@ -325,7 +355,7 @@ export function openBookSettings(app, initialTab = 'general', { focus } = {}) {
         return field('Watermark', h('div', { class: 'row-inline wm-row' }, wm, strength), 'Printed faintly across every page of the print preview and the PDF. Leave it empty for none.');
       })()),
   };
-  const seg = segmented([{ value: 'general', label: 'General' }, { value: 'cover', label: 'Covers' }, { value: 'chapters', label: 'Chapters' }, { value: 'print', label: 'Print' }], initialTab,
+  const seg = segmented([{ value: 'general', label: 'General' }, { value: 'cover', label: 'Covers' }, { value: 'chapters', label: 'Chapters' }, { value: 'style', label: 'Style' }, { value: 'print', label: 'Print' }], initialTab,
     (v) => pane.replaceChildren(tabs[v]()), { label: 'Settings section' });
   pane.replaceChildren(tabs[initialTab]());
   const backup = h('div', { class: 'bk-backup' },

@@ -2,34 +2,34 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "lutefisk@1.0.0",
-  "documentNamespace": "http://spdx.org/spdxdocs/lutefisk-1.0.0-7b6c5b44-657d-4f7a-855a-77f5c89d5866",
+  "name": "lutefisk-book-editor@1.0.0",
+  "documentNamespace": "http://spdx.org/spdxdocs/lutefisk-book-editor-1.0.0-604fa146-43dd-4cef-a480-88f9542f34df",
   "creationInfo": {
-    "created": "2026-11-15T17:10:37.108Z",
+    "created": "2026-11-27T05:27:01.890Z",
     "creators": [
       "Tool: npm/cli-10.9.9"
     ]
   },
   "documentDescribes": [
-    "SPDXRef-Package-lutefisk-1.0.0"
+    "SPDXRef-Package-lutefisk-book-editor-1.0.0"
   ],
   "packages": [
     {
-      "name": "lutefisk",
-      "SPDXID": "SPDXRef-Package-lutefisk-1.0.0",
+      "name": "lutefisk-book-editor",
+      "SPDXID": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "versionInfo": "1.0.0",
       "packageFileName": "",
       "description": "Local-first book writing and formatting studio with live device previews.",
       "primaryPackagePurpose": "LIBRARY",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "homepage": "NOASSERTION",
+      "homepage": "https://github.com/johnlwhiteman/lutefisk-book-editor#readme",
       "licenseDeclared": "MIT",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:npm/lutefisk@1.0.0"
+          "referenceLocator": "pkg:npm/lutefisk-book-editor@1.0.0"
         }
       ]
     },
@@ -78,6 +78,30 @@
         {
           "algorithm": "SHA512",
           "checksumValue": "4a9f157bcfab42610d6362efd36547eec2e99edcd34ef9e772724c4db444ec35fa4cbc46ada378ca465fcda51622808599aa26c24bcd8aa9a53e4aca06e0e848"
+        }
+      ]
+    },
+    {
+      "name": "@fontsource/caveat",
+      "SPDXID": "SPDXRef-Package-fontsource.caveat-5.3.0",
+      "versionInfo": "5.3.0",
+      "packageFileName": "node_modules/@fontsource/caveat",
+      "description": "Self-host the Caveat font in a neatly bundled NPM package.",
+      "downloadLocation": "https://registry.npmjs.org/@fontsource/caveat/-/caveat-5.3.0.tgz",
+      "filesAnalyzed": false,
+      "homepage": "https://fontsource.org/fonts/caveat",
+      "licenseDeclared": "OFL-1.1",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/%40fontsource/caveat@5.3.0"
+        }
+      ],
+      "checksums": [
+        {
+          "algorithm": "SHA512",
+          "checksumValue": "7874dfcd0c45496f400444512cdaee1e834998a79dd89ee9a9351ce65a786b83ce3205c62a9c665a3dddf47cf5d2498083a8ae4d32dee946a06c0e1b9ec99f43"
         }
       ]
     },
@@ -1717,252 +1741,257 @@
   "relationships": [
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DESCRIBES"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.alegreya-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.atkinson-hyperlegible-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-fontsource.caveat-5.3.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.cinzel-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.cormorant-garamond-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.courier-prime-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.crimson-pro-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.eb-garamond-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.im-fell-english-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.inter-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.jetbrains-mono-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.lato-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.libre-baskerville-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.libre-caslon-text-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.literata-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.lora-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.merriweather-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.noto-serif-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.open-sans-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.opendyslexic-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.playfair-display-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.pt-serif-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.roboto-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.shippori-mincho-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.source-serif-4-5.3.1",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.spectral-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.stix-two-math-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.uncial-antiqua-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fontsource.unifrakturmaguntia-5.3.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-docx-9.15.3",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-dompurify-3.4.17",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-fflate-0.8.3",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-harper.js-3.2.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-highlight.js-11.12.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-markdown-it-15.0.3",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-commands-1.7.2",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-dropcursor-1.8.4",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-gapcursor-1.4.1",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-history-1.5.1",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-inputrules-1.5.1",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-keymap-1.2.3",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-markdown-1.13.9",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-model-1.25.13",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-schema-list-1.6.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-state-1.4.4",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-tables-1.8.5",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-transform-1.12.5",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-prosemirror-view-1.42.9",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-temml-0.14.0",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
       "spdxElementId": "SPDXRef-Package-yaml-2.9.1",
-      "relatedSpdxElement": "SPDXRef-Package-lutefisk-1.0.0",
+      "relatedSpdxElement": "SPDXRef-Package-lutefisk-book-editor-1.0.0",
       "relationshipType": "DEPENDENCY_OF"
     },
     {
